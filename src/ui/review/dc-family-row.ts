@@ -75,7 +75,7 @@ export class DcFamilyRow extends LitElement {
     const s = r.source;
     const cls = [!this.member && this.selectable && !this.on ? 'off' : '', this.member && this.done ? 'done' : ''].filter(Boolean).join(' ');
     return html`<calcite-list label=${s.title} interaction-mode="static">
-      <calcite-list-item value=${s.id} data-id=${s.id} ?open=${r.views.length > 0} class=${cls}>
+      <calcite-list-item value=${s.id} data-id=${s.id} ?expanded=${r.views.length > 0} class=${cls}>
         <span slot="content-start" class="lead">
           ${this.selectable && !this.member
             ? html`<calcite-checkbox label="Include ${s.title} in the digest" .checked=${this.on}

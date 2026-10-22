@@ -125,14 +125,12 @@ flowchart LR
     App -->|"only when you send"| Log
     App --- Cache
     Pages["GitHub Pages"] -.->|"serves the files"| App
-    CF["Cloudflare Web Analytics"] -.->|"anonymous page views"| App
 ```
 
 - **No Decluttering server and no third-party storage.** GitHub Pages only serves the app's files. Your scan results and settings stay in this browser, and you can clear them from the user menu.
 - **Sign-in is ArcGIS Online OAuth 2.0 with PKCE.** The token stays in this browser tab, goes in request headers (never in a web address), and is revoked when you sign out.
 - **Every request passes an allow-list before it is made.** The scan may only read; sending may only touch the app's own hidden group; the log may only add rows to its own table. See `SECURITY.md`.
 - **The nudge log** (optional) is a hosted table in your own org. It records who was nudged, when, and which items, never the message text.
-- **Analytics:** the hosted site counts anonymous page views with Cloudflare Web Analytics. There are no cookies, and no org data, item ids or user names (the app keeps all of that in the browser).
 
 ![Your data: your browser talks only to your own ArcGIS Online org](docs/images/about-data.png)
 
@@ -173,7 +171,6 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`.
 1. Settings › Pages › Source: **GitHub Actions**.
 2. Settings › Secrets and variables › Actions › **Variables**:
    - `VITE_ARCGIS_CLIENT_ID` (required)
-   - `VITE_CF_BEACON_TOKEN` (optional: the token from a Cloudflare Web Analytics site; the beacon is added to production builds only when it is set)
 
 ## Built with
 
