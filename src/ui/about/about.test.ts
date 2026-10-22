@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ABOUT_SECTIONS, APPROVED_APPS_URL, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, REPO_URL, backLabel, issuesLine, repoLine } from './content';
+import { ABOUT_SECTIONS, APPROVED_APPS_URL, OPEN_DISCLAIMER, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, REPO_URL, backLabel, issuesLine, repoLine } from './content';
 import { PRESETS } from '../../domain/stale';
 
 const sentences = (s: string) => s.split(/(?<=[.?!])\s+/).filter(Boolean).length;
@@ -72,5 +72,14 @@ describe('About admin guide (DC-125f)', () => {
     const text = JSON.stringify(s);
     expect(text).toContain('Approved apps');
     expect(text).toContain("We'll add exact steps here");
+  });
+});
+
+describe('About disclaimer (user, 2026-10-23)', () => {
+  it('says gently that it is independent, as is, test first, and invites a look at the code', () => {
+    expect(OPEN_DISCLAIMER.before).toContain('independent, open-source project, not an Esri or Esri Australia product');
+    expect(OPEN_DISCLAIMER.before).toContain('send yourself a test first');
+    expect(OPEN_DISCLAIMER.before).toContain('policies');
+    expect(OPEN_DISCLAIMER.linkText).toBe('review the code on GitHub');
   });
 });

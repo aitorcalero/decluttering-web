@@ -265,14 +265,20 @@ export async function scanCore(request: RequestFn, opts: ScanOptions): Promise<C
   const sourceOf = new Map<string, string | null>();
   const viewJobs: Promise<void>[] = [];
   let viewsSeen = 0, viewsDone = 0;
-  const traceView = async (v: Json) => {
+  // A view whose source isn't found is left out of the results (stale.ts families), so a failed or empty lookup is tried
+  // once more before giving up (user, 2026-10-23).
+  const lookupSource = async (id: string): Promise<string | null> => {
     try {
-      const r = await call(`content/items/${str(v.id)}/relatedItems`, { relationshipType: 'Service2Service', direction: 'reverse', num: 100 }, { priority: PRIORITY.views }) as Json;
-      sourceOf.set(str(v.id), ((r.relatedItems as Item[] | undefined) ?? [])[0]?.id ?? null);
+      const r = await call(`content/items/${id}/relatedItems`, { relationshipType: 'Service2Service', direction: 'reverse', num: 100 }, { priority: PRIORITY.views }) as Json;
+      return ((r.relatedItems as Item[] | undefined) ?? [])[0]?.id ?? null;
     } catch (e) {
       if (isAbort(e) || isBlocked(e)) throw e;
-      sourceOf.set(str(v.id), null);
+      return null;
     }
+  };
+  const traceView = async (v: Json) => {
+    const id = str(v.id);
+    sourceOf.set(id, (await lookupSource(id)) ?? (await lookupSource(id)));
     viewsDone++;
     meter.set('views', viewsDone, findDone ? viewsSeen : null);
     progress('views', viewsDone, viewsSeen, `Finding which services are views, ${fmt(viewsDone)} of ${fmt(viewsSeen)}`);

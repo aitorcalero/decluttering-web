@@ -65,10 +65,10 @@ describe('dot map model (DC-064)', () => {
     expect(dotWhy(buildDots({ found: [], sized: new Map(), data, depsKnown: true }).dots[0]!)).toMatch(/no maps or apps use it$/);
   });
 
-  it('a view not yet linked to its source is marked, so the size floor leaves it alone', () => {
+  it('a view with no source in the scan gets no dot: it is left out of the results (user, 2026-10-23)', () => {
     const v = svc({ isView: true, sourceId: null, sizeMB: 0 });
     const m = buildDots({ found: [], sized: new Map(), data: mk([v]), depsKnown: false });
-    expect(m.dots[0]?.view).toBe(true);
+    expect(m.dots).toHaveLength(0);
   });
 
   it('rings outside the zone only on the "Used by maps" lens', () => {
@@ -128,7 +128,7 @@ describe('dot map model (DC-064)', () => {
       const m = buildDots({ found, sized: new Map(), data: null, depsKnown: false, usage });
       expect(m.revealed).toBe(true);
       expect(m.exact).toBe(false);
-      expect(m.dots.map((d) => d.id)).toEqual(['a', 'b', 'v']); // a view stands alone until the core links it
+      expect(m.dots.map((d) => d.id)).toEqual(['a', 'b']); // a view waits for the core, which folds it into its source (no stray dot)
       const [a, b] = m.dots;
       expect(a?.sized).toBe(false);
       expect(a?.lastUsedDaysAgo).toBe(null);

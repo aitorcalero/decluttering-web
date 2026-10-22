@@ -6,7 +6,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { hrefOf, type Route } from '../../routes/router';
 import '@esri/calcite-components/dist/components/calcite-icon';
 import '@esri/calcite-components/dist/components/calcite-button';
-import { ABOUT_INTRO, ABOUT_SECTIONS, APPROVED_APPS_LINK_TEXT, APPROVED_APPS_URL, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, backLabel, issuesLine, repoLine, type Block, type FlowId } from './content';
+import { ABOUT_INTRO, ABOUT_SECTIONS, APPROVED_APPS_LINK_TEXT, APPROVED_APPS_URL, OPEN_DISCLAIMER, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, backLabel, issuesLine, repoLine, type Block, type FlowId } from './content';
 import './dc-app-data';
 import type { AppDataOrg } from './app-data';
 import type { GroupNotifier } from '../../notify';
@@ -54,6 +54,11 @@ export class DcAbout extends LitElement {
     return html`<p class="about-repo"><a href=${r.href} target="_blank" rel="noopener noreferrer">${mark}<span>${r.text}</span></a></p>`;
   }
 
+  private disclaimer() {
+    const r = repoLine(import.meta.env.VITE_REPO_URL as string | undefined);
+    return html`<p class="about-disclaimer" data-about="disclaimer">${OPEN_DISCLAIMER.before}<a href=${r.href} target="_blank" rel="noopener noreferrer">${OPEN_DISCLAIMER.linkText}<span class="about-sr"> (opens in a new tab)</span></a>${OPEN_DISCLAIMER.after}</p>`;
+  }
+
   private issues() {
     const i = issuesLine(import.meta.env.VITE_REPO_URL as string | undefined);
     return html`<p>${i.before}<a href=${i.link.href} target="_blank" rel="noopener noreferrer">${i.link.text}<span class="about-sr"> (opens in a new tab)</span></a>${i.after}</p>`;
@@ -81,6 +86,7 @@ export class DcAbout extends LitElement {
             ${s.id === 'open' ? html`<p><calcite-button class="about-contact" href=${CONTACT_URL} target="_blank" rel="noopener noreferrer" appearance="outline" scale="s" icon-start="envelope">${CONTACT_LINK_TEXT}<span class="about-sr"> (opens in a new tab)</span></calcite-button></p>` : nothing}
           </div>
         </details>` : nothing}
+        ${s.id === 'open' ? this.disclaimer() : nothing}
       </section>${s.id === 'email' ? this.appData() : nothing}`)}
     </article>`;
   }

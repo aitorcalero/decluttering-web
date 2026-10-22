@@ -209,9 +209,10 @@ export function sizeBand(dots: readonly { sized: boolean; sizeMB: number }[]): {
   let unmeasured = 0, none = 0;
   for (const d of dots) { if (!d.sized) unmeasured++; else if (d.sizeMB < SIZE_LO) none++; }
   const f = fmtInt;
-  if (unmeasured && none) return { label: 'none or not measured', note: `${f(unmeasured)} not measured yet, ${f(none)} with no storage` };
+  if (unmeasured && none) return { label: 'minimal or not measured', note: `${f(unmeasured)} not measured yet, ${f(none)} with minimal storage` };
   if (unmeasured) return { label: 'not measured yet', note: `${f(unmeasured)} not measured yet` };
-  return { label: 'no storage', note: none ? `${f(none)} with no storage` : '' };
+  // Under 0.1 MB: a hosted view has none of its own, a tiny layer a little, so "minimal", not "no storage" (user, 2026-10-23).
+  return { label: 'minimal', note: none ? `${f(none)} with minimal storage` : '' };
 }
 
 /** A stable jitter index from an item id (FNV-1a), so a dot keeps its place when the floor or a merge removes others. */

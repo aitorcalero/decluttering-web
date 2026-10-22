@@ -19,6 +19,13 @@ export const REPO_TEXT_LINKED = 'Source code on GitHub';
 /** FB-79: the public repository. Every build links to it; VITE_REPO_URL overrides it (a fork or self-host). */
 export const REPO_URL = 'https://github.com/simongis/decluttering-web';
 
+/** A gentle disclaimer at the foot of the open-source section (user, 2026-10-23); the README has the full one. */
+export const OPEN_DISCLAIMER = {
+  before: "Decluttering is an independent, open-source project, not an Esri or Esri Australia product. It's offered as is: send yourself a test first, and check it fits your organisation's policies. You're welcome to ",
+  linkText: 'review the code on GitHub',
+  after: '.',
+} as const;
+
 /** The GitHub line: always a link. VITE_REPO_URL wins when it is a web address, otherwise the public repository. */
 export function repoLine(url: string | undefined): { text: string; href: string } {
   const u = (url ?? '').trim();

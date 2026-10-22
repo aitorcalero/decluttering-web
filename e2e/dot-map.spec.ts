@@ -54,15 +54,15 @@ test('FB-43: How big leaves out the no-storage dots with the small layers, and S
   await mount(page);
   const line = page.locator('dc-dot-map [data-scan="small-floor"]');
   await expect(line).toContainText('6 layers under 3 MB');
-  await expect(line).not.toContainText('no storage'); // How stale keeps them: real families there
+  await expect(line).not.toContainText('minimal storage'); // How stale keeps them: real families there
   await page.locator('dc-dot-map calcite-segmented-control-item[value="big"]').click();
-  await expect(line).toContainText('6 layers under 3 MB (about 6.0 credits a month) and 4 with no storage are hidden.');
+  await expect(line).toContainText('6 layers under 3 MB (about 6.0 credits a month) and 4 with minimal storage (under 0.1 MB) are hidden.');
   const toggle = page.locator('dc-dot-map [data-scan="small-toggle"]');
   await expect(toggle).toHaveText('Show them');
   await toggle.focus();
   await expect(toggle).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(line).toContainText('and 4 with no storage are shown.');
+  await expect(line).toContainText('and 4 with minimal storage (under 0.1 MB) are shown.');
   await expect(toggle).toHaveText('Hide them');
 });
 

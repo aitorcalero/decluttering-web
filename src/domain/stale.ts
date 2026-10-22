@@ -125,15 +125,17 @@ function buildFamilies(data: Data): Family[] {
   const byId = new Map(data.services.map((s) => [s.id, s]));
   const fam = new Map<string, Family>();
   const hasSource = (s: Service) => s.isView && !!s.sourceId && byId.has(s.sourceId);
-  for (const s of data.services) if (!hasSource(s)) fam.set(s.id, { id: s.id, source: s, views: [] });
+  // A hosted view costs no credits; it only matters through its source. One whose source isn't in this org's scan (a lookup
+  // that failed, bad data) is left out entirely: never its own family, row, dot or email (user, 2026-10-23).
+  for (const s of data.services) if (!hasSource(s) && !s.isView) fam.set(s.id, { id: s.id, source: s, views: [] });
   for (const s of data.services) if (hasSource(s)) {
     // views of views resolve to the root source. A cycle of view sources (bad data) would loop for ever: a view caught
-    // in one stands alone as its own family instead (DC-084).
+    // in one is left out (DC-084; user, 2026-10-23).
     let root = byId.get(s.sourceId as string) as Service;
     const seen = new Set<string>([s.id]);
     while (hasSource(root) && !seen.has(root.id)) { seen.add(root.id); root = byId.get(root.sourceId as string) as Service; }
-    if (hasSource(root)) fam.set(s.id, { id: s.id, source: s, views: [] });
-    else fam.get(root.id)?.views.push(s);
+    if (hasSource(root)) continue; // a cycle (bad data): no source to belong to, so left out like a lone view
+    fam.get(root.id)?.views.push(s);
   }
   const out: Family[] = [];
   const kept = new Map<string, Family>();

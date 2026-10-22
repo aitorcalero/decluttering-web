@@ -16,6 +16,9 @@ test('About shows the diagrams, the GitHub link and the contact link', async ({ 
   await expect(page.locator('dc-about .about-repo a')).toHaveAttribute('href', 'https://github.com/simongis/decluttering-web');
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', /noopener/);
+  const disc = page.locator('dc-about [data-about="disclaimer"]');
+  await expect(disc).toContainText('not an Esri or Esri Australia product');
+  await expect(disc.locator('a')).toHaveAttribute('href', 'https://github.com/simongis/decluttering-web');
 });
 
 // DC-125f: the admin guide for orgs that only allow approved apps.

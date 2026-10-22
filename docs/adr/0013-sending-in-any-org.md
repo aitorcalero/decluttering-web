@@ -34,4 +34,4 @@
 - In their place: straight after the switch-on, while the site is still unpublicised, the developer opts in on the **live site** in a second org they administer and sends themselves a test. That covers turning sending on outside the org that registered the client ID. Reading another admin's log and the approved-apps behaviour stay UNVERIFIED until seen in use.
 - The kill switch is unchanged: set `VITE_SENDING=off` and run the deploy workflow.
 - The footer names the site in plain text, not a link: ArcGIS Online refused the link (COM_1132) in the development-org test.
-
+- **Post-switch-on trial passed, 2026-10-23 (user):** on the live site, signed in with a different ArcGIS Online account in a second org, the admin turned sending on and test emails arrived. Turning sending on outside the org that registered the client ID is CONFIRMED.

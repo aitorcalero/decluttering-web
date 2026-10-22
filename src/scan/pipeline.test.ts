@@ -154,6 +154,24 @@ describe('views', () => {
     const r = await scanOrg(f.request, opts);
     expect(find(r, PARKS_VIEW)).toMatchObject({ isView: true, sourceId: null });
   });
+
+  it('retries a failed source lookup once, and links the view when the retry works (user, 2026-10-23)', async () => {
+    let n = 0;
+    const f = fakeOrg({ [`content/items/${PARKS_VIEW}/relatedItems`]: async () => {
+      n++; if (n === 1) throw Object.assign(new Error('x'), { status: 500 }); return { relatedItems: [{ id: PARKS }] };
+    } });
+    const r = await scanOrg(f.request, opts);
+    expect(n).toBe(2);
+    expect(find(r, PARKS_VIEW)).toMatchObject({ isView: true, sourceId: PARKS });
+  });
+
+  it('retries an empty lookup once too, and stops after that one retry', async () => {
+    let n = 0;
+    const f = fakeOrg({ [`content/items/${PARKS_VIEW}/relatedItems`]: async () => { n++; return { relatedItems: [] }; } });
+    const r = await scanOrg(f.request, opts);
+    expect(n).toBe(2);
+    expect(find(r, PARKS_VIEW)).toMatchObject({ isView: true, sourceId: null });
+  });
 });
 
 describe('usage', () => {

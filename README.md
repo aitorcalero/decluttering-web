@@ -188,6 +188,10 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`.
 
 [Calcite Design System](https://developers.arcgis.com/calcite-design-system/), [ArcGIS REST JS](https://developers.arcgis.com/arcgis-rest-js/), [Lit](https://lit.dev/), [D3](https://d3js.org/) and [Driver.js](https://driverjs.com/), with Vite and TypeScript. Third-party notices: `LICENSES.md`.
 
+## Version
+
+**1.0.0** (23 October 2026): scan and review any ArcGIS Online org you sign in to, and, once you turn sending on for yourself and send yourself a test, one friendly email per owner. One shared app for every organisation; nothing to register or install.
+
 ## Disclaimer
 
 - Decluttering is an independent, open-source project. It is not an Esri or Esri Australia product, and it is not endorsed or supported by either.

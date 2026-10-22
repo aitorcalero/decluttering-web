@@ -122,10 +122,10 @@ describe('dot map motion (DC-082, FB-33)', () => {
 
   it('FB-30: the left column on "How big" says what is in it', () => {
     const d = (sized: boolean, sizeMB: number) => ({ sized, sizeMB });
-    expect(sizeBand([d(true, 40)])).toEqual({ label: 'no storage', note: '' });
-    expect(sizeBand([d(true, 0), d(true, 0.05), d(true, 40)])).toEqual({ label: 'no storage', note: '2 with no storage' });
+    expect(sizeBand([d(true, 40)])).toEqual({ label: 'minimal', note: '' });
+    expect(sizeBand([d(true, 0), d(true, 0.05), d(true, 40)])).toEqual({ label: 'minimal', note: '2 with minimal storage' });
     expect(sizeBand([d(false, 0), d(false, 0), d(true, 40)])).toEqual({ label: 'not measured yet', note: '2 not measured yet' });
-    expect(sizeBand([d(false, 0), d(true, 0), d(true, 40)])).toEqual({ label: 'none or not measured', note: '1 not measured yet, 1 with no storage' });
+    expect(sizeBand([d(false, 0), d(true, 0), d(true, 40)])).toEqual({ label: 'minimal or not measured', note: '1 not measured yet, 1 with minimal storage' });
     expect(sizeBand([d(false, 0), ...Array.from({ length: 1600 }, () => d(false, 0))]).note).toBe('1,601 not measured yet');
   });
 });

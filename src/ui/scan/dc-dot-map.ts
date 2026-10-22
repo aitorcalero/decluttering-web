@@ -7,7 +7,7 @@ import { PORTAL_URL } from '../../auth/config';
 import { formatMB, fmtInt, itemUrl } from '../../domain/format';
 import { PRESET_NAMES } from '../../domain/stale';
 import type { Org, Thresholds } from '../../domain/types';
-import { SCAN_THRESHOLDS, SHOW_ALL_BELOW, dotWhy, SMALL_LAYER_MB, rampK, ringed, withSmallFloor, type Dot, type DotModel, type HiddenSmall } from './dots';
+import { NO_STORAGE_MB, SCAN_THRESHOLDS, SHOW_ALL_BELOW, dotWhy, SMALL_LAYER_MB, rampK, ringed, withSmallFloor, type Dot, type DotModel, type HiddenSmall } from './dots';
 import {
   DENSITY_ABOVE, ENTER_MS, FADE_MS, HEIGHT_MS, LENSES, LENS_MS, LENS_STAGGER_MS, RAMP, STAGGER_MAX_MS, TRAVEL_MS, Y_BAND,
   clamp, densityAlpha, densityBins, entryLook, hash, heightTween, lensPoint, mapHeight, motionAt, pendingRadius, prePoint,
@@ -552,12 +552,12 @@ export class DcDotMap extends LitElement {
     const note = ready ? LENSES.find((l) => l.id === this.picked)?.note ?? '' : ''; // FB-56: the switch stays disabled until usage is in; no line needed
     const dense = m.revealed && m.dots.length > DENSITY_ABOVE;
     const asDots = dense ? m.dots.filter((d) => d.kind === 'stale' || d.candidate).length : 0;
-    // DC-079 and FB-43: what the floor leaves out, in one line ("4,018 layers under 3 MB (...) and 13 with no storage").
+    // DC-079 and FB-43: what the floor leaves out, in one line ("4,018 layers under 3 MB (...) and 13 with minimal storage (under 0.1 MB)").
     const hidN = hid.count + hid.noStorage;
     const small = hid.count > 0 ? `${fmtInt(hid.count)} ${hid.count === 1 ? 'layer' : 'layers'} under ${SMALL_LAYER_MB} MB (${this.creditsText(hid.credits)} a month)` : '';
-    const empty = hid.noStorage > 0 ? `${fmtInt(hid.noStorage)}${small ? '' : hid.noStorage === 1 ? ' layer' : ' layers'} with no storage` : '';
+    const empty = hid.noStorage > 0 ? `${fmtInt(hid.noStorage)}${small ? '' : hid.noStorage === 1 ? ' layer' : ' layers'} with minimal storage (under ${NO_STORAGE_MB} MB)` : '';
     const hiddenLine = [small, empty].filter(Boolean).join(' and ');
-    const hiddenNote = [hid.count > 0 ? `Layers under ${SMALL_LAYER_MB} MB` : '', hid.noStorage > 0 ? (hid.count > 0 ? 'layers with no storage' : 'Layers with no storage') : ''].filter(Boolean).join(' and ');
+    const hiddenNote = [hid.count > 0 ? `Layers under ${SMALL_LAYER_MB} MB` : '', hid.noStorage > 0 ? (hid.count > 0 ? 'layers with minimal storage' : 'Layers with minimal storage') : ''].filter(Boolean).join(' and ');
     return html`
       <div class="dm-wrap" data-lens=${this.lens}>
         <div class="dm-lens">

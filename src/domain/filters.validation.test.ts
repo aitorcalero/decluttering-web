@@ -388,27 +388,23 @@ describe('families: a source and its hosted views are judged as one', () => {
     expect(ev.totals).toMatchObject({ families: 1, services: 3, sizeMB: 100, credits: 24 });
   });
 
-  it('a view whose source is missing stands alone with its own use', () => {
+  it('a view whose source is missing is left out: no family, no row, so it can never be flagged or emailed (user, 2026-10-23)', () => {
     const orphan = svc({ isView: true, sourceId: 'not-in-scan', sizeMB: 0, usage: usedOn(3) });
-    const fams = families(org([orphan]));
-    expect(fams).toHaveLength(1);
-    expect(fams[0]?.source.id).toBe(orphan.id);
-    expect(rowOf(org([orphan]), orphan.id).lastUsedDaysAgo).toBe(3);
+    expect(families(org([orphan]))).toHaveLength(0);
+    const ev = evaluate(org([orphan]), PRESETS.balanced);
+    expect(ev.totals).toMatchObject({ families: 0, services: 0, credits: 0 });
   });
 
-  it('LIMITATION: a view whose source is missing has 0 MB (known), so every starting point hides it', () => {
-    const orphan = svc({ isView: true, sourceId: 'not-in-scan', sizeMB: null });
-    const r = rowOf(org([orphan]), orphan.id);
-    expect(r.sizeKnown).toBe(true);
-    expect(r.sizeMB).toBe(0);
-    for (const p of Object.values(PRESETS)) expect(flagged(orphan, p)).toBe(false);
-    expect(flagged(orphan, { ...PRESETS.balanced, minSizeMB: 0 })).toBe(true); // only "Any size" shows it
+  it('a view with no source id at all is left out too, while an ordinary layer stays', () => {
+    const lone = svc({ isView: true, sourceId: null, sizeMB: 0 });
+    const layer = svc({ sizeMB: 40 });
+    expect(families(org([lone, layer])).map((f) => f.source.id)).toEqual([layer.id]);
   });
 
-  it('LIMITATION: two views of the same missing source are two separate families, not one', () => {
+  it('two views of the same missing source are both left out (no longer two stray families)', () => {
     const a = svc({ isView: true, sourceId: 'gone', sizeMB: 0 });
     const b = svc({ isView: true, sourceId: 'gone', sizeMB: 0 });
-    expect(families(org([a, b]))).toHaveLength(2);
+    expect(families(org([a, b]))).toHaveLength(0);
   });
 
   it("the family belongs to the source owner: a colleague's view is nudged to the source owner", () => {
@@ -727,12 +723,11 @@ describe('Suggested: the gentlest rung near 15% of services, at most 40 owners',
 });
 
 describe('families with bad data (DC-084 fix)', () => {
-  it('a cycle of view sources terminates, and each view in it stands alone', async () => {
+  it('a cycle of view sources terminates, and the views in it are left out (no source to belong to)', async () => {
     const { families } = await import('./stale');
     const svc = (id: string, sourceId: string) => ({ id, title: id, owner: 'amy', created: '2020-01-01T00:00:00Z', modified: '2020-01-01T00:00:00Z', sizeMB: 0, access: 'org', isView: true, sourceId, usage: [], dependencies: [] });
     const data = { org: { id: 'o', name: 'o', urlKey: '', scannedAt: '2026-10-16T00:00:00Z' }, owners: [], services: [svc('a', 'b'), svc('b', 'a')] };
     const f = families(data as never);
-    expect(f.map((x) => x.id).sort()).toEqual(['a', 'b']);
-    expect(f.every((x) => x.views.length === 0)).toBe(true);
+    expect(f).toEqual([]);
   });
 });
