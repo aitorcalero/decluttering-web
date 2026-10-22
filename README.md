@@ -2,6 +2,8 @@
 
 **Tidy up your ArcGIS Online content, gently.**
 
+https://simongis.github.io/decluttering-web/
+
 Decluttering finds the hosted feature layers in your org that nobody seems to use, shows you why each one was picked out and what it costs in credits, and helps you send each owner **one friendly email** about them. Owners decide what happens to their own layers. The app **never deletes, moves or changes anyone's items**.
 
 It runs entirely in your browser. There is no Decluttering server, and nothing goes anywhere except your own ArcGIS Online org.
