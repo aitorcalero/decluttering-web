@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+!.env.private.example
+test-results/
+playwright-report/
+.DS_Store
+temp/
+
+# Vite / Playwright
+*.tsbuildinfo
+
+# Claude Code local tooling (agent worktrees)
+.claude/
+
+# Local list of strings that must never be published (see publish/sensitive.example.txt)
+publish/sensitive.local.txt
+dist-e2e-*/
+.playwright-mcp/

@@ -1,0 +1,41 @@
+/* DC-113 (FB-69): the Review tour (Driver.js), in our tokens. Calcite's mode variables follow light and dark. */
+.driver-popover.dc-tour {
+  background: var(--calcite-color-foreground-1, #fff);
+  color: var(--calcite-color-text-1, var(--dc-text));
+  border: 1px solid var(--calcite-color-border-1, var(--dc-border));
+  border-radius: var(--dc-radius-l);
+  box-shadow: var(--dc-shadow-2);
+  font-family: var(--dc-font-sans);
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem 1.1rem 0.85rem;
+}
+.dc-tour .driver-popover-title { font-family: var(--dc-font-display); font-size: 1.0625rem; font-weight: 600; line-height: 1.35; padding-inline-end: 1.75rem; }
+.dc-tour .driver-popover-description { font-size: 0.9375rem; line-height: 1.5; color: var(--calcite-color-text-2, var(--dc-text-muted)); }
+.dc-tour .driver-popover-close-btn { color: var(--calcite-color-text-3, var(--dc-text-muted)); top: 0.35rem; right: 0.35rem; border-radius: var(--dc-radius); }
+.dc-tour .driver-popover-close-btn:hover, .dc-tour .driver-popover-close-btn:focus { color: var(--calcite-color-text-1, var(--dc-text)); }
+.dc-tour .driver-popover-progress-text { color: var(--calcite-color-text-3, var(--dc-text-muted)); font-size: 0.8125rem; }
+.dc-tour .driver-popover-footer-btn {
+  background: transparent; color: var(--dc-accent); border: 1px solid var(--dc-accent); border-radius: var(--dc-radius);
+  padding: 0.3rem 0.75rem; font-size: 0.875rem; font-weight: 500;
+}
+.dc-tour .driver-popover-footer-btn:hover, .dc-tour .driver-popover-footer-btn:focus { background: var(--calcite-color-foreground-2, var(--dc-neutral-100)); }
+.dc-tour .driver-popover-next-btn { background: var(--dc-accent); color: var(--dc-accent-contrast); }
+.dc-tour .driver-popover-next-btn:hover, .dc-tour .driver-popover-next-btn:focus { background: var(--dc-brand-600); color: var(--dc-accent-contrast); }
+.dc-tour button:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 2px; }
+/* Always-visible ways out. */
+.dc-tour-exits { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px solid var(--calcite-color-border-3, var(--dc-border)); }
+.dc-tour-exits button {
+  all: unset; cursor: pointer; font-size: 0.8125rem; color: var(--calcite-color-text-2, var(--dc-text-muted)); text-decoration: underline; text-underline-offset: 2px; border-radius: var(--dc-radius);
+}
+.dc-tour-exits button:hover { color: var(--calcite-color-text-1, var(--dc-text)); }
+.dc-tour-exits button:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 2px; }
+/* The arrow takes the card's colour (Driver paints it white). */
+.dc-tour .driver-popover-arrow { border-color: var(--calcite-color-foreground-1, #fff); }
+.dc-tour .driver-popover-arrow-side-left { border-top-color: transparent; border-bottom-color: transparent; border-right-color: transparent; }
+.dc-tour .driver-popover-arrow-side-right { border-top-color: transparent; border-bottom-color: transparent; border-left-color: transparent; }
+.dc-tour .driver-popover-arrow-side-top { border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; }
+.dc-tour .driver-popover-arrow-side-bottom { border-top-color: transparent; border-left-color: transparent; border-right-color: transparent; }
+/* No animated transitions for people who ask for less motion (the code also turns Driver's animation off). */
+@media (prefers-reduced-motion: reduce) {
+  .driver-popover, .driver-overlay, .dc-tour { animation: none !important; transition: none !important; }
+}

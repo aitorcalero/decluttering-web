@@ -1,0 +1,17 @@
+/* ADR 0012: the "App data in your org" section on About. Tokens from tokens.css. */
+dc-app-data { display: block; }
+dc-app-data .appdata { padding: 1rem 0; border-top: 1px solid var(--calcite-color-border-3); }
+dc-app-data h2 { font-family: var(--dc-font-display); font-weight: 500; font-size: 1.15rem; margin: 0 0 0.35rem; color: var(--dc-text); }
+dc-app-data .appdata-intro, dc-app-data .appdata-quiet { margin: 0 0 0.6rem; color: var(--calcite-color-text-2); }
+dc-app-data .appdata-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+dc-app-data .appdata-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 0.4rem 1rem; align-items: center;
+  padding: 0.75rem 0.9rem; border: 1px solid var(--calcite-color-border-3); border-radius: var(--dc-radius-s);
+}
+dc-app-data .appdata-name { font-weight: 500; color: var(--dc-text); }
+dc-app-data .appdata-note { display: block; font-size: 0.9rem; color: var(--calcite-color-text-2); }
+dc-app-data .appdata-actions { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; }
+dc-app-data .appdata-link { color: var(--calcite-color-text-link); }
+dc-app-data .appdata-link:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: 2px; }
+dc-app-data .appdata-fail { margin: 0.6rem 0 0; }
+@media (max-width: 600px) { dc-app-data .appdata-row { grid-template-columns: 1fr; } }

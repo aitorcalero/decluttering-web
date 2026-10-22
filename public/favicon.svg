@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Simplified for 16-32 px: bolder strokes, larger tick, glyph fills about 80% of the tile -->
+  <rect width="32" height="32" rx="7" fill="#092340"/>
+  <g transform="translate(1.6 1.6) scale(1.2)" fill="none" stroke="#fff" stroke-width="2.3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M12 3.2l8.6 4.3-8.6 4.3-8.6-4.3z"/>
+    <path d="M3.4 13l8.6 4.3"/>
+    <path d="M3.4 18.2l7 3.5"/>
+    <path d="M14.6 18.4l2.6 2.6 4.2-5" stroke="#faa61a" stroke-width="2.8"/>
+  </g>
+</svg>

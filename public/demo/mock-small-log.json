@@ -1,0 +1,35 @@
+{
+ "about": "DC-096: the demo nudge log: rows as the app's hosted table would hold them (no email addresses, no message text). Read through the real log code over an in-memory fake.",
+ "rows": [
+  {
+   "owner": "tquinn_riverside",
+   "sent_at": 1770766200000,
+   "item_ids": "ec39b2612b73a8dc67bb6adb90280c50,2b19e57fdf26ee83c9a9f64e618aa955,59d4cc7ef68d0bb2301a9aad1a28844a,a3d62aaae9667c3be26e2919c0e72bdd,5c1e7a0b9d2f4e6a8b3c1d0e9f7a6b52,8e4d2c6a0f1b3e5d7c9a2b4f6e8d0c13",
+   "item_count": 6,
+   "credits": 98.4,
+   "sender": "demo_admin",
+   "app_version": "decluttering-web 0.1",
+   "is_test": 0
+  },
+  {
+   "owner": "tkovacs_riverside",
+   "sent_at": 1773965700000,
+   "item_ids": "23d7a5046bb3e1d9e4cffb32603d718a,706fabda5f487c269ee5916dd9b41356,4657296026d2c09430a9553504f333ec,b7f3a91c2e6d48057a1c9e3b5d2f8a64",
+   "item_count": 4,
+   "credits": 9.6,
+   "sender": "demo_admin",
+   "app_version": "decluttering-web 0.1",
+   "is_test": 0
+  },
+  {
+   "owner": "erossi_riverside",
+   "sent_at": 1787734800000,
+   "item_ids": "4be39a22b8ed26033442289ab242c93f,e77fa2b3637efd7fe79f3a28585e77cb,3937bf9d7a28d4133884a105101b15e4,f2a8c4e6b0d2e4f6a8c0b2d4e6f8a0c1,6d0b9e3f1a7c5e2d8b4f0a6c3e9d1b75",
+   "item_count": 5,
+   "credits": 41.2,
+   "sender": "demo_admin",
+   "app_version": "decluttering-web 0.1",
+   "is_test": 0
+  }
+ ]
+}

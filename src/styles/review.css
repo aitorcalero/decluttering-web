@@ -1,0 +1,249 @@
+/*
+ * Review screen styles (ported from prototype D, prototypes/d-converged/style.css).
+ * Semantic colour rules (ADR 0006): Boustead Blue is the app's own colour and never a status.
+ *   stale = Raspberry (solid marks only) | at risk = Amber (tints allowed) | disabled = Midnight outline
+ *   reclaimable = Pine Green (good outcomes only) | nudged = slate, neutral history.
+ */
+dc-review, dc-filters, dc-owner-list { display: block; }
+dc-family-row { display: block; }
+
+dc-review {
+  /* DC-090 (finding 1): 21.5rem holds the five-option starting point control; the side column's child may shrink to
+     its track (a grid item is otherwise no narrower than its min-content), and a real 1.5rem gutter. */
+  .dc-review-grid { --dc-panel-w: 21.5rem; display: grid; grid-template-columns: var(--dc-panel-w) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .dc-review-main, .dc-review-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  /* z-index: sticky makes a stacking context, so without it the list painted over the filter popovers and dialog */
+  .dc-review-side { position: sticky; top: 0; z-index: 2; }
+  /* A11Y-07: the panel is about 530 px tall; on a window shorter than that plus the Next bar it cannot all be reached while pinned, so it scrolls with the page. */
+  @media (max-height: 40rem) { .dc-review-side { position: static; } }
+  /* DC-114 (FB-72): the sticky Next bar (z-index 5) painted over the foot of an open info popover; lift the column while one is open. */
+  @supports selector(:has(*)) { .dc-review-side:has(calcite-popover[open]) { z-index: 6; } }
+  .mi-grid { grid-template-columns: var(--dc-panel-w) minmax(0, 1fr) 300px; }
+  .mi-side { display: grid; gap: 1rem; }
+  @media (max-width: 1250px) { .mi-grid { grid-template-columns: var(--dc-panel-w) minmax(0, 1fr); } .mi-grid .mi-side { grid-column: 2; } }
+
+  /* DC-090 (finding 3): one page head across both columns, so the panel and the summary start on the same line */
+  .pagehead { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.25rem 1.5rem; }
+  .pagehead-ctx { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.875rem; color: var(--calcite-color-text-3); }
+  .pagehead-ctx p { margin: 0; }
+  .pagehead-ctx [hidden] { display: none; }
+
+  /* DC-090 (finding 7): on phones the panel folds to one line, closed until opened */
+  .panel-fold { display: none; }
+  @media (max-width: 900px) {
+    .dc-review-grid, .mi-grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .dc-review-side { position: static; }
+    .mi-grid .mi-side { grid-column: auto; }
+    .panel-fold {
+      display: flex; align-items: center; gap: 0.5rem; width: 100%; min-height: 2.75rem; padding: 0.5rem 0.9rem; text-align: start;
+      font: inherit; font-size: 0.9rem; color: var(--calcite-color-text-1); cursor: pointer;
+      background: var(--calcite-color-foreground-1); border: 1px solid var(--dc-card-line); border-radius: var(--dc-radius); box-shadow: var(--dc-shadow-1);
+    }
+    .panel-fold calcite-icon { color: var(--calcite-color-text-2); flex: none; }
+    .pf-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pf-text b { font-weight: 500; color: var(--dc-heading); }
+    .pf-act { color: var(--calcite-color-text-link); font-weight: 500; text-decoration: underline; text-underline-offset: 0.18em; }
+    .panel-fold:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: 2px; }
+    [data-panel-open="false"] dc-filters { display: none; }
+  }
+
+  h1, h2 { font-family: var(--dc-font-display); margin: 0; color: var(--dc-text); }
+  h1 { font-size: 1.75rem; line-height: 1.2; font-weight: 400; }
+  h2 { font-size: 1.1rem; font-weight: 500; color: var(--dc-heading); }
+  .lede { margin: 0.25rem 0 0; color: var(--calcite-color-text-2); max-width: 62ch; line-height: 1.5; }
+  .muted { color: var(--calcite-color-text-3); }
+  .small { font-size: 0.85rem; }
+
+  /* chips (recoloured through Calcite's custom properties) */
+  calcite-chip { --calcite-chip-corner-radius: 999px; }
+  calcite-chip.c-reclaim, calcite-chip.c-plain {
+    --calcite-chip-background-color: transparent; --calcite-chip-border-color: var(--calcite-color-border-1);
+    --calcite-chip-text-color: var(--calcite-color-text-1); --calcite-chip-icon-color: var(--calcite-color-text-2);
+  }
+  calcite-chip.c-risk { --calcite-chip-background-color: var(--dc-risk-tint); --calcite-chip-border-color: transparent; --calcite-chip-text-color: var(--dc-risk); --calcite-chip-icon-color: var(--dc-risk); }
+  calcite-chip.c-inactive { --calcite-chip-background-color: transparent; --calcite-chip-border-color: var(--dc-inactive-line); --calcite-chip-text-color: var(--dc-inactive); --calcite-chip-icon-color: var(--dc-inactive); }
+  calcite-chip.c-nudged { --calcite-chip-background-color: var(--dc-nudged-tint); --calcite-chip-border-color: transparent; --calcite-chip-text-color: var(--dc-nudged); --calcite-chip-icon-color: var(--dc-nudged); }
+  .sw { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; margin-right: 0.3rem; flex: none; }
+  .sw.reclaim { background: var(--dc-reclaim-solid); }
+  calcite-avatar { --calcite-avatar-background-color: var(--dc-nudged-tint); --calcite-avatar-color: var(--dc-nudged); }
+  calcite-link { white-space: nowrap; }
+
+  /* DC-090 (FB-39, accent option D): elevated white cards on the grey page, no outline and no coloured bars in light mode.
+     Dark mode keeps a 1 px line (--dc-card-line, app.css): shadows barely show on the dark background. */
+  .summary, .chart-block, .unreach, .nudge, .owner, .since {
+    border-radius: var(--dc-radius); overflow: hidden; border: 1px solid var(--dc-card-line); box-shadow: var(--dc-shadow-1);
+    background: var(--calcite-color-foreground-1); --calcite-block-heading-text-color: var(--dc-heading);
+  }
+  calcite-block.chart-block, calcite-block.unreach, calcite-block.nudge, calcite-block.since { margin: 0; }
+  /* review summary: title and context with three figure chips (big Boustead Blue numbers), then the notes */
+  .summary { display: grid; }
+  .sum-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem 1.25rem; padding: 0.7rem 1rem; }
+  /* DC-090 (finding 5): the status notes are plain lines with icons, part of the numbers they qualify */
+  .notes { list-style: none; margin: 0; padding: 0.75rem 1rem 0.85rem; border-top: 1px solid var(--calcite-color-border-1); display: grid; gap: 0.45rem; font-size: 0.875rem; line-height: 1.45; color: var(--calcite-color-text-2); }
+  .notes li { display: flex; align-items: flex-start; gap: 0.5rem; max-width: 75ch; }
+  .notes calcite-icon { flex: none; margin-top: 0.15rem; color: var(--calcite-color-text-3); }
+  .dc-textlink { font: inherit; font-weight: 600; color: var(--calcite-color-text-link); background: none; border: 0; padding: 0 0.1rem; margin: 0; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; border-radius: 2px; }
+  .dc-textlink:hover { text-decoration-thickness: 2px; }
+  .dc-textlink:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: 2px; }
+  .summary h2 { font-size: 1.1rem; display: flex; align-items: baseline; gap: 0.35rem; flex-wrap: wrap; }
+  .summary h2 .ctx { color: var(--calcite-color-text-3); font-weight: 400; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+  .fig { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.8rem 0.3rem 0; font-size: 0.85rem; color: var(--dc-heading); background: transparent; font-variant-numeric: tabular-nums; }
+  .fig .ic { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--dc-brand-50); color: var(--dc-boustead-blue); flex: none; }
+  .fig b { font-family: var(--dc-font-display); font-size: 1.6rem; font-weight: 500; line-height: 1; color: var(--dc-boustead-blue); }
+  .fig small { color: var(--calcite-color-text-2); font-size: 0.85rem; }
+  .fig .of { color: var(--calcite-color-text-3); font-size: 0.8rem; }
+  .fig.f-cred .ic { background: transparent; color: var(--dc-pine); }
+  /* DC-090 (FB-40): one chart card, How stale (dot map) | By owner (Sankey) */
+  .chart-view { padding: 0.25rem 1rem 1rem; }
+  .chart-view[hidden] { display: none; }
+  .chart-view .dm-stage canvas { background: var(--dc-plot-plate); }
+  .chart-block calcite-segmented-control { align-self: center; margin-inline: 0.5rem; }
+  @media (max-width: 600px) { .chart-view { padding: 0.25rem 0.5rem 0.75rem; } }
+
+  /* list */
+  .list-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; min-height: 2rem; border-bottom: 2px solid var(--dc-brand-100); padding-bottom: 0.35rem; }
+  .owner-list { display: grid; gap: 1rem; }
+  /* .owner is an elevated card (above); its header band is transparent with a hairline under it (finding 10) */
+  .owner-top { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--calcite-color-border-1); background: transparent; }
+  .owner.none .owner-top strong { color: var(--calcite-color-text-3); }
+  .owner-id { flex: 1; min-width: 0; }
+  .owner-id strong { display: block; font-family: var(--dc-font-display); font-weight: 500; font-size: 1.05rem; }
+  .owner-id span { font-size: 0.85rem; color: var(--calcite-color-text-3); }
+  .owner-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+  .owner-flags { display: flex; gap: 0.35rem; flex-wrap: wrap; padding: 0.5rem 1rem 0; }
+  /* DC-115 (FB-74): the owner's picture is a link to their content. After a short hover or focus a ring, a small "opens elsewhere"
+     badge and a one-line tip fade in (under 150 ms); the delay stops a pass of the pointer from flashing them. Touch: no delay. */
+  .owner-pic { position: relative; flex: none; display: inline-grid; border-radius: 50%; text-decoration: none; color: inherit; line-height: 0; }
+  .owner-pic::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--calcite-color-brand); opacity: 0; pointer-events: none; }
+  .owner-pic:focus-visible { outline: none; }
+  .pic-badge { position: absolute; right: -4px; bottom: -4px; width: 1.1rem; height: 1.1rem; display: grid; place-items: center; border-radius: 50%;
+    background: var(--calcite-color-brand); color: #fff; box-shadow: var(--dc-shadow-1); opacity: 0; transform: scale(0.7); pointer-events: none; }
+  .pic-badge calcite-icon { --calcite-icon-color: #fff; }
+  .pic-tip { position: absolute; left: 0; top: calc(100% + 0.4rem); z-index: 3; width: max-content; max-width: min(15rem, 60vw); padding: 0.3rem 0.55rem; border-radius: var(--dc-radius);
+    background: var(--dc-midnight); color: #fff; font-size: 0.8rem; line-height: 1.3; box-shadow: var(--dc-shadow-2); opacity: 0; transform: translateY(-3px); pointer-events: none; }
+  .owner-pic::after, .pic-badge, .pic-tip { transition: opacity var(--dc-dur-fast) var(--dc-ease-out) 400ms, transform var(--dc-dur-fast) var(--dc-ease-out) 400ms; }
+  .owner-pic:hover::after, .owner-pic:focus-visible::after, .owner-pic:hover .pic-badge, .owner-pic:focus-visible .pic-badge,
+  .owner-pic:hover .pic-tip, .owner-pic:focus-visible .pic-tip { opacity: 1; transform: none; }
+  @media (hover: none) { .owner-pic::after, .pic-badge, .pic-tip { transition-delay: 0s; } .pic-tip { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .owner-pic::after, .pic-badge, .pic-tip { transition-duration: 0.001ms; transform: none; } }
+  .owner-foot { display: grid; gap: 0.2rem; padding: 0.6rem 1rem; border-top: 1px solid var(--calcite-color-border-1); }
+  .owner-foot .count { color: var(--calcite-color-text-3); margin-left: 0.25rem; font-size: 0.85rem; }
+  .why-tick { margin: 0; font-size: 0.85rem; color: var(--calcite-color-text-2); }
+  .more-wrap { padding: 0.25rem 0.75rem 0.5rem; }
+  .empty { display: grid; gap: 0.5rem; justify-items: start; padding: 2rem 0; }
+
+  /* item rows */
+  .row-title { display: grid; gap: 0.15rem; min-width: 0; }
+  .row-title > calcite-link { font-size: 1rem; font-weight: 500; line-height: 1.35; } /* FB-12: item names lead the row */
+  .row-title .why { font-size: 0.85rem; color: var(--calcite-color-text-2); }
+  .row-title .share { font-size: 0.8rem; color: var(--calcite-color-text-3); }
+  /* Title and end chips share the content slot (Calcite's end slot can't wrap): side by side when there's room, chips drop below otherwise */
+  .row-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1rem; min-width: 0; }
+  .row-main > .row-title { flex: 1 1 18rem; }
+  .row-end { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; flex: 0 1 auto; }
+  /* tidy priority (ADR 0010): three dots plus the label, never colour alone */
+  .prio { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 500; color: var(--dc-text); cursor: help; }
+  .prio .dots { display: inline-flex; gap: 2px; }
+  .prio .dots i { width: 0.45rem; height: 0.45rem; border-radius: 50%; border: 1.5px solid var(--dc-neutral-500); box-sizing: border-box; }
+  .prio .dots i.on { background: var(--dc-neutral-500); }
+  .prio.start { color: var(--dc-boustead-blue); }
+  .prio.start .dots i { border-color: var(--dc-boustead-blue); }
+  .prio.start .dots i.on { background: var(--dc-boustead-blue); }
+  .prio.low { color: var(--calcite-color-text-2); }
+  .owner-start { font-size: 0.85rem; font-weight: 500; color: var(--dc-boustead-blue); }
+  .list-tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .sort-ctl { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--calcite-color-text-2); }
+  .lead { display: inline-flex; align-items: center; gap: 0.5rem; }
+  calcite-icon.svc { color: var(--calcite-color-text-2); }
+  calcite-list-item.off .row-title, calcite-list-item.off .row-end, calcite-list-item.off calcite-icon.svc { color: var(--calcite-color-text-3); --calcite-icon-color: var(--calcite-color-text-3); }
+  calcite-list-item.off .row-title calcite-link { text-decoration: line-through; text-decoration-color: var(--dc-neutral-300); }
+  .tidy { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--calcite-color-text-3); }
+  .tidy calcite-icon { color: var(--dc-neutral-400); flex: none; }
+  .spark { width: 4.6rem; flex: none; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; margin-inline-end: 0.5rem; }
+  .spark svg { display: block; }
+  .spark small { font-size: 0.65rem; line-height: 1; color: var(--calcite-color-text-3); }
+  .spark .b { fill: var(--dc-boustead-blue); }
+  .spark .z { fill: var(--dc-neutral-300); }
+
+  /* member mode */
+  .mi-p { margin: 0 0 0.75rem; line-height: 1.5; color: var(--calcite-color-text-2); font-size: 0.9rem; }
+  .mi-done { white-space: nowrap; font-size: 0.85rem; justify-self: start; margin-top: 0.15rem; }
+  .mi-count { font-size: 0.85rem; color: var(--calcite-color-text-3); }
+  calcite-list-item.done .row-title calcite-link, calcite-list-item.done .why, calcite-list-item.done .tidy { opacity: 0.6; }
+  .mi-grid .row-end, .solo-grid .row-end { justify-content: flex-end; max-width: 15rem; }
+  .mi-grid .row-title, .solo-grid .row-title { min-width: 12rem; }
+  .block-pad { padding: 0.25rem 0.75rem 0.75rem; }
+  .hint { margin: 0.35rem 0 0; font-size: 0.8rem; line-height: 1.45; color: var(--calcite-color-text-3); }
+
+  /* No one to nudge */
+  .unreach-note { margin: 0 0.75rem 0.5rem; color: var(--calcite-color-text-2); font-size: 0.9rem; max-width: 70ch; }
+  .unreach-list { padding: 0 0.75rem 0.75rem; display: grid; gap: 0.75rem; }
+  .un-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  /* DC-096: "Since your nudges", an elevated card (accent D) above the summary; the per-owner list opens inside it */
+  dc-since-nudges { display: block; }
+  .since { --calcite-block-heading-text-color: var(--dc-heading); }
+  .since calcite-icon[slot="icon"] { color: var(--dc-pine); }
+  .sn-body { padding: 0 0.75rem 0.75rem; display: grid; gap: 0.75rem; }
+  .sn-note { margin: 0; }
+  .sn-head { display: flex; align-items: baseline; gap: 0.25rem 0.6rem; flex-wrap: wrap; }
+  .sn-items { list-style: none; margin: 0.35rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: 0.9rem; }
+  .sn-items li { display: flex; align-items: center; flex-wrap: wrap; gap: 0.15rem 0.5rem; min-width: 0; }
+  .sn-items li calcite-icon { flex: none; color: var(--calcite-color-text-3); }
+  .sn-items li[data-outcome="gone"] calcite-icon { color: var(--dc-pine); }
+  .sn-items calcite-link { white-space: normal; min-width: 0; }
+  .sn-out { color: var(--calcite-color-text-2); font-size: 0.85rem; }
+  .sn-gone-id { color: var(--calcite-color-text-2); }
+  .sn-tip { flex-basis: 100%; padding-inline-start: 1.5rem; color: var(--calcite-color-text-3); font-size: 0.8rem; }
+  .un-items { margin: 0.35rem 0 0; padding-inline-start: 1.6rem; display: grid; gap: 0.15rem; font-size: 0.9rem; }
+}
+
+dc-filters {
+  calcite-panel { border: 1px solid var(--dc-card-line); box-shadow: var(--dc-shadow-1); border-radius: var(--dc-radius); overflow: hidden; --calcite-panel-heading-text-color: var(--dc-heading); }
+  calcite-block { --calcite-block-heading-text-color: var(--dc-heading); }
+  .words { margin: 0.6rem 0 0; font-size: 0.85rem; line-height: 1.4; color: var(--calcite-color-text-2); }
+  .hint { margin: 0.35rem 0 0; font-size: 0.8rem; line-height: 1.45; color: var(--calcite-color-text-3); }
+  .fields { display: grid; gap: 0.5rem; padding: 0 0.75rem 0.5rem; }
+  .pop { padding: 0.75rem 0.9rem; max-width: min(22rem, calc(100vw - 3rem)); box-sizing: border-box; max-height: calc(100vh - 9rem); overflow-y: auto; display: grid; gap: 0.5rem; font-size: 0.875rem; line-height: 1.45; color: var(--calcite-color-text-1); }
+  .pop:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: -2px; }
+  .pop p { margin: 0; }
+  .pop-table { border-collapse: collapse; width: 100%; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .pop-table th, .pop-table td { padding: 0.25rem 0.3rem; text-align: start; border-bottom: 1px solid var(--dc-card-line); }
+  .pop-table thead th { font-weight: 500; color: var(--calcite-color-text-2); font-size: 0.75rem; }
+  .pop-table tbody th { font-weight: 600; }
+  .pop-table td, .pop-table tbody th { white-space: nowrap; }
+  .pop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+  .pop-list li { display: grid; grid-template-columns: auto 1fr; gap: 0.45rem; align-items: start; }
+  .pop-list calcite-icon { margin-top: 0.2rem; }
+  .pop-list .ok { color: var(--calcite-color-status-success); }
+  .pop-list .aside { color: var(--calcite-color-text-3); }
+  /* DC-055: the small items dialog */
+  #small-dlg .small-dlg { display: grid; gap: 0.5rem; padding: 0.25rem 0.25rem 0.5rem; }
+  #small-dlg .lede { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--calcite-color-text-1); }
+  .fields calcite-label { --calcite-label-margin-bottom: 0; }
+  .fields calcite-select { margin-top: 0.15rem; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .sel-ago { display: flex; align-items: center; gap: 0.5rem; }
+  .sel-ago > calcite-select { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dc-review *, dc-filters * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* DC-035a: maps and apps with missing layers, a quiet card under the owner list (a sibling of dc-review, so its own rules) */
+dc-broken-refs {
+  display: block;
+  .broken {
+    margin: 1rem 0 0; border-radius: var(--dc-radius); overflow: hidden; border: 1px solid var(--dc-card-line); box-shadow: var(--dc-shadow-1);
+    background: var(--calcite-color-foreground-1); --calcite-block-heading-text-color: var(--dc-heading);
+  }
+  .broken calcite-icon[slot="icon"] { color: var(--dc-pine); }
+  .muted { color: var(--calcite-color-text-3); }
+  .small { font-size: 0.85rem; }
+  calcite-link { white-space: nowrap; }
+  .br-body { padding: 0 0.75rem 0.75rem; display: grid; gap: 0.5rem; }
+  .br-note { margin: 0; max-width: 70ch; }
+  .br-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.9rem; }
+  .br-list li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.15rem 0.6rem; }
+}

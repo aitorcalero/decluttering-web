@@ -1,0 +1,75 @@
+/* DC-092 (FB-36, option D): a white header with a 3 px Boustead Blue rule on top and a soft shadow under it; the page
+   sits on the light grey app background (Calcite's shell paints foreground-1, white, by default) so white cards lift. */
+calcite-shell { background-color: var(--dc-bg); }
+
+/* DC-090 (FB-39, option D): cards are elevated, with no outline in light mode; in dark mode shadows barely show, so a 1 px line.
+   --dc-heading: Midnight headings on light; in dark mode Midnight is unreadable on the dark surface, so the text colour.
+   The dot map's canvas is drawn in light colours (scan.css: light only), so in dark mode it sits on a light plate. */
+:root { --dc-card-line: transparent; --dc-heading: var(--dc-midnight); --dc-plot-plate: transparent; }
+@media (prefers-color-scheme: dark) { :root:not(.calcite-mode-light), .calcite-mode-auto { --dc-card-line: var(--calcite-color-border-1); --dc-heading: var(--calcite-color-text-1); --dc-plot-plate: #f5f8fa; } }
+.calcite-mode-dark { --dc-card-line: var(--calcite-color-border-1); --dc-heading: var(--calcite-color-text-1); --dc-plot-plate: #f5f8fa; }
+/* Calcite's shell lays its content out as a flex column with justify-content: space-between. Signed in, the shell also holds
+   the (zero-height) access dialog next to <main>, so on a tall window with a short page space-between pushed <main> to the
+   bottom and left a blank band under the header (seen on an ultrawide, Review > By owner). An auto bottom margin takes the
+   free space first, so <main> always sits directly under the header. */
+calcite-shell > main { margin-block-end: auto; }
+calcite-shell > calcite-navigation[slot="header"] {
+  position: relative; z-index: var(--dc-z-header, 450);
+  --calcite-navigation-background-color: var(--dc-surface);
+  border-block-start: 3px solid var(--dc-accent);
+  box-shadow: var(--dc-shadow-header);
+}
+
+/* App shell: header logo (matches prototype D: 36 px mark, 22 px name; smaller on phones) and the scan screen. */
+.dc-logo { display: flex; align-items: center; gap: 0.6rem; padding-inline: 1rem 0.5rem; height: 100%; }
+.dc-logo img { width: 36px; height: 36px; display: block; }
+.dc-logo .dc-name { font-family: var(--dc-font-display); font-size: 1.375rem; font-weight: 500; line-height: 1; color: var(--dc-text); white-space: nowrap; }
+.dc-logo .dc-org { margin-inline-start: 0.4rem; padding-inline-start: 0.75rem; border-inline-start: 1px solid var(--calcite-color-border-1); font-size: 0.875rem; color: var(--calcite-color-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22rem; }
+@media (max-width: 600px) { .dc-logo { gap: 0.45rem; padding-inline: 0.75rem 0.25rem; } .dc-logo img { width: 32px; height: 32px; } .dc-logo .dc-name { font-size: 1.2rem; } .dc-logo .dc-org { display: none; } }
+
+/* DC-098 (FB-54): the mark and name are one link home. */
+.dc-logo .dc-home { display: flex; align-items: center; gap: inherit; color: inherit; text-decoration: none; border-radius: 4px; padding: 0.25rem; margin: -0.25rem; }
+.dc-logo .dc-home:focus-visible { outline: 2px solid var(--calcite-color-focus, var(--dc-boustead-blue)); outline-offset: 2px; }
+
+/* DC-098 (FB-55): who is signed in. Initials sit on Boustead Blue with white text (7.63:1); in dark mode the 60% tint
+   with Midnight text (tokens.css). The menu is a 4 px popover with the name, username, org, then the sign-out choices. */
+.dc-user { display: flex; align-items: stretch; height: 100%; }
+.dc-user calcite-navigation-user, .dc-user-menu calcite-avatar {
+  --calcite-avatar-background-color: var(--dc-boustead-blue);
+  --calcite-avatar-color: #fff;
+  --calcite-navigation-user-avatar-color: #fff;
+  --calcite-navigation-accent-color: var(--dc-accent);
+}
+@media (prefers-color-scheme: dark) { :root:not(.calcite-mode-light) :is(.dc-user calcite-navigation-user, .dc-user-menu calcite-avatar) { --calcite-avatar-background-color: var(--dc-brand-300); --calcite-avatar-color: var(--dc-midnight); --calcite-navigation-user-avatar-color: var(--dc-midnight); } }
+.calcite-mode-dark :is(.dc-user calcite-navigation-user, .dc-user-menu calcite-avatar) { --calcite-avatar-background-color: var(--dc-brand-300); --calcite-avatar-color: var(--dc-midnight); --calcite-navigation-user-avatar-color: var(--dc-midnight); }
+.dc-user calcite-popover { --calcite-popover-corner-radius: 4px; }
+.dc-user-menu { width: min(20rem, calc(100vw - 2rem)); padding: 1rem; box-sizing: border-box; }
+.dc-user-who { display: flex; gap: 0.75rem; align-items: center; padding-block-end: 0.875rem; margin-block-end: 0.875rem; border-block-end: 1px solid var(--calcite-color-border-1); }
+.dc-user-who > div { min-width: 0; }
+.dc-user-who p { margin: 0; overflow-wrap: anywhere; }
+.dc-user-name { font-family: var(--dc-font-display); font-size: 1.05rem; font-weight: 500; color: var(--dc-heading); }
+.dc-user-handle, .dc-user-org { font-size: 0.85rem; color: var(--calcite-color-text-2); }
+.dc-user-actions { display: grid; gap: 0.5rem; }
+.dc-user-hint { margin: 0.125rem 0 0; font-size: 0.8rem; line-height: 1.4; color: var(--calcite-color-text-3); }
+
+[data-page="app"] .reassure { max-width: 40rem; color: var(--calcite-color-text-2); line-height: 1.5; }
+[data-scan="progress"] .stop { margin-top: 0.75rem; }
+[data-scan="progress"] progress { accent-color: var(--dc-boustead-blue); height: 0.5rem; }
+
+/* DC-063: percent done and finish estimate (outside the live region), and the tips line under the progress */
+[data-scan="progress"] .scan-meta { margin: 0.35rem 0 0; font-size: 0.9rem; color: var(--calcite-color-text-2); font-variant-numeric: tabular-nums; }
+.dc-tip { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.9rem; font-size: 0.9rem; color: var(--calcite-color-text-2); min-height: 2.75rem; flex-wrap: wrap; }
+.dc-tip calcite-icon { flex: none; transition: opacity 300ms ease; }
+.dc-tip-body { flex: 1 1 14rem; transition: opacity 300ms ease; }
+.dc-tip.dc-tip-out .dc-tip-body, .dc-tip.dc-tip-out calcite-icon { opacity: 0; }
+.dc-tip a { color: var(--calcite-color-text-link, inherit); text-decoration: underline; }
+.dc-tip a:focus-visible { outline: 2px solid var(--calcite-color-brand, #2e5e8c); outline-offset: 1px; border-radius: 2px; }
+.dc-tip calcite-action { flex: none; }
+.dc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 600px) { .dc-tip calcite-action { min-block-size: 44px; min-inline-size: 44px; } }
+@media (prefers-reduced-motion: reduce) { .dc-tip-body, .dc-tip calcite-icon { transition: none; } }
+
+/* DC-105: the cache note and the quiet Rescan button share the review's page-head context line. */
+.rescan-ctx { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
+.rescan-ctx p { margin: 0; }
+.rescan-ctx [hidden] { display: none; }

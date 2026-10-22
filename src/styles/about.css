@@ -1,0 +1,61 @@
+/* DC-021: the About page. Tokens from tokens.css. */
+dc-about { display: block; }
+dc-about .about { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+dc-about .about-back { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0 0 0.75rem -0.25rem; padding: 0.2rem 0.25rem; color: var(--calcite-color-text-link); text-decoration: none; border-radius: var(--dc-radius-s); }
+dc-about .about-back:hover { text-decoration: underline; }
+dc-about .about-back:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: 2px; }
+dc-about h1 { font-family: var(--dc-font-display); font-weight: 400; margin: 0 0 0.25rem; color: var(--dc-text); }
+dc-about .about-intro { margin: 0 0 1.5rem; color: var(--calcite-color-text-2); }
+dc-about .about-sec { padding: 1rem 0; border-top: 1px solid var(--calcite-color-border-3); }
+dc-about h2 { font-family: var(--dc-font-display); font-weight: 500; font-size: 1.15rem; margin: 0 0 0.35rem; color: var(--dc-text); }
+dc-about .about-lead { margin: 0 0 0.5rem; }
+dc-about .about-more summary {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.25rem; margin-left: -0.25rem;
+  color: var(--calcite-color-text-link); font-size: 0.9rem; list-style: none; border-radius: var(--dc-radius-s);
+}
+dc-about .about-more summary::-webkit-details-marker { display: none; }
+dc-about .about-more summary::before {
+  content: ""; width: 0.45rem; height: 0.45rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform var(--dc-dur-fast) var(--dc-ease-out);
+}
+dc-about .about-more[open] summary::before { transform: rotate(45deg); }
+dc-about .about-more summary:hover { text-decoration: underline; }
+dc-about .about-more summary:focus-visible { outline: 2px solid var(--calcite-color-brand); outline-offset: 2px; }
+dc-about .about-detail { margin-top: 0.5rem; padding-left: 0.9rem; border-left: 3px solid var(--dc-brand-100); color: var(--calcite-color-text-2); font-size: 0.92rem; }
+dc-about .about-detail p, dc-about .about-detail ul { margin: 0 0 0.6rem; }
+dc-about .about-detail ul { padding-left: 1.1rem; }
+dc-about .about-detail li { margin-bottom: 0.25rem; }
+@media (prefers-reduced-motion: reduce) { dc-about .about-more summary::before { transition: none; } }
+@media (max-width: 600px) { dc-about .about { padding: 1rem 0.75rem 2rem; } }
+
+/* DC-110: diagrams, GitHub line, contact link. Stacked on narrow screens, a row from 700px. */
+dc-about .about-flow { margin: 0.75rem 0 0.9rem; }
+dc-about .about-flow-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 0.9rem; }
+dc-about .about-flow-step {
+  position: relative; display: grid; grid-template-columns: 3rem 1fr; column-gap: 0.75rem; align-items: center;
+  padding: 0.6rem 0.75rem; background: var(--dc-surface); border: 1px solid var(--dc-border); border-radius: var(--dc-radius-l);
+}
+dc-about .about-flow-icon {
+  grid-row: 1 / span 2; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%;
+  background: color-mix(in srgb, var(--dc-accent) 14%, var(--dc-surface)); color: var(--dc-accent);
+}
+dc-about .about-flow-label { font-weight: 500; color: var(--dc-text); align-self: end; }
+dc-about .about-flow-note { font-size: 0.85rem; color: var(--dc-text-muted); align-self: start; }
+/* Arrow between steps: points down when stacked. */
+dc-about .about-flow-step + .about-flow-step::before {
+  content: ""; position: absolute; left: 1.5rem; top: -0.8rem; width: 0.5rem; height: 0.5rem; margin-left: 0.75rem;
+  border-right: 2px solid var(--dc-neutral-400); border-bottom: 2px solid var(--dc-neutral-400); transform: rotate(45deg);
+}
+@media (min-width: 700px) {
+  dc-about .about-flow-steps { flex-direction: row; gap: 1.6rem; }
+  dc-about .about-flow-step { flex: 1 1 0; grid-template-columns: 1fr; justify-items: center; text-align: center; row-gap: 0.15rem; padding: 0.8rem 0.6rem; }
+  dc-about .about-flow-icon { grid-row: auto; margin-bottom: 0.3rem; }
+  dc-about .about-flow-label, dc-about .about-flow-note { align-self: auto; }
+  dc-about .about-flow-step + .about-flow-step::before { left: -1.15rem; top: 50%; margin: -0.25rem 0 0; transform: rotate(-45deg); }
+}
+dc-about .about-repo { margin: 0.25rem 0 0.5rem; }
+dc-about .about-repo a { display: inline-flex; align-items: center; gap: 0.45rem; }
+dc-about .about-repo a { color: var(--calcite-color-text-link); }
+dc-about .about-gh { flex: none; }
+dc-about .about-contact { display: inline-block; }
+dc-about .about-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

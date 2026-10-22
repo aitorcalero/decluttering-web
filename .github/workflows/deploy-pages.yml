@@ -1,0 +1,54 @@
+# Deploys the app to GitHub Pages. Lives at publish/github/workflows/ in the private repo and is copied
+# to .github/workflows/ by publish/export.mjs. One-time setup: Settings > Pages > Source: GitHub Actions.
+# Repository variables: VITE_ARCGIS_CLIENT_ID (public client ID), VITE_CF_BEACON_TOKEN (optional).
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_ARCGIS_CLIENT_ID: ${{ vars.VITE_ARCGIS_CLIENT_ID }}
+          VITE_CF_BEACON_TOKEN: ${{ vars.VITE_CF_BEACON_TOKEN }}
+          # About links to this repository (and its Issues page).
+          VITE_REPO_URL: https://github.com/${{ github.repository }}
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

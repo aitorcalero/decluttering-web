@@ -1,0 +1,238 @@
+/*
+ * Design tokens for the ArcGIS Online admin prototype (Esri Calcite, re-themed).
+ *
+ * SOURCE (ADR 0006, docs/adr/0006-brand-system.md)
+ *   Boustead Geospatial Brand Style Guide, August 2025 v1, condensed in docs/branding/boustead-design-system.md.
+ *   - Primary Boustead Blue #1b51a3. Secondary Midnight Blue #092340 and Amber #faa61a.
+ *   - Tertiary (sparingly, never tinted, never large solid fills): Pine Green #006f48, Raspberry Red #b01f59.
+ *     Glacier Blue #0077ac is defined for completeness but unused (too close to Boustead Blue).
+ *   - Tints at 80/60/40/20% for primary and secondary only. Computed here as a mix with white.
+ *   - Type: Roboto for UI, Fira Sans (Light/Regular) for headings and display numbers, Arial in email, Fira Mono for code.
+ *   - Shape: 4 px corners on cards, panels, popovers and dialogs, 247.5 degree angle (used only as an angled edge accent).
+ *   SUPERSEDED: the teal #029779 / #017a64 and navy #002443 taken from boustead.sg in DC-002, and Figtree.
+ *   Those are gone; nothing in the prototypes should reference them.
+ *
+ * CALCITE (3.3.3, names checked against calcite.css and the component bundles)
+ *   --calcite-color-brand / -hover / -press, --calcite-color-text-link, --calcite-color-text-inverse,
+ *   --calcite-font-family, --calcite-card-corner-radius, --calcite-panel-corner-radius,
+ *   --calcite-popover-corner-radius (components default to square corners).
+ *   calcite.css sets its own colours on .calcite-mode-light/-dark/-auto, which beat :root, so this file targets
+ *   .calcite-mode-auto as well as :root.
+ *
+ * CONTRAST (WCAG 2.x, 4.5:1 normal text). Light mode: Boustead Blue 7.63, Midnight 15.84, Pine 6.24, Raspberry 6.59
+ * on white; Midnight on Amber 7.94. Dark mode: the 60% Boustead Blue tint is the brand fill with Midnight text on it;
+ * tertiaries cannot be tinted, so in dark mode they are solid marks only and text next to them is neutral.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;700&family=Fira+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap");
+
+/* ---------- Scheme-independent tokens ---------- */
+:root {
+  /* Fonts */
+  --dc-font-sans: "Roboto", "Helvetica Neue", Arial, sans-serif;     /* all UI text */
+  --dc-font-display: "Fira Sans", "Helvetica Neue", Arial, sans-serif; /* headings and display numbers */
+  --dc-font-email: Arial, Helvetica, sans-serif;                      /* owner email template */
+  --dc-font-mono: "Fira Mono", Consolas, "Liberation Mono", monospace;
+
+  /* Brand colours, as supplied */
+  --dc-boustead-blue: #1b51a3;
+  --dc-midnight: #092340;
+  --dc-amber: #faa61a;
+  --dc-pine: #006f48;
+  --dc-glacier: #0077ac;   /* unused */
+  --dc-raspberry: #b01f59;
+
+  /* Boustead Blue ramp. 50-400 are tints (10/20/40/60/80% over white); 600-900 darken toward Midnight. */
+  --dc-brand-50: #eef3fa;
+  --dc-brand-100: #d1dced;  /* 20% */
+  --dc-brand-200: #a4b9da;  /* 40% */
+  --dc-brand-300: #7697c8;  /* 60% */
+  --dc-brand-400: #4974b5;  /* 80% */
+  --dc-brand-500: #1b51a3;  /* Boustead Blue; white text 7.63:1 */
+  --dc-brand-600: #164385;  /* hover */
+  --dc-brand-700: #103568;  /* press */
+  --dc-brand-800: #0b2a50;
+  --dc-brand-900: #092340;  /* Midnight */
+  --dc-brand-navy: var(--dc-midnight); /* legacy name: heading / link colour */
+
+  /* Amber tints (primary and secondary may be tinted) */
+  --dc-amber-80: #fbb848;
+  --dc-amber-60: #fcca76;
+  --dc-amber-40: #fddba3;
+  --dc-amber-20: #feedd1;
+
+  /* Neutrals (cool, Midnight-tinted) */
+  --dc-neutral-50: #f5f8fa;
+  --dc-neutral-100: #e9eff3;
+  --dc-neutral-200: #d5dee5;
+  --dc-neutral-300: #b5c2cc;
+  --dc-neutral-400: #8a9aa7;
+  --dc-neutral-500: #64788a;
+  --dc-neutral-600: #4a5b66;
+  --dc-neutral-700: #34434f;
+  --dc-neutral-800: #22303b;
+  --dc-neutral-900: #13212e;
+  --dc-neutral-950: #0b1a26;
+
+  /* Shape (DC-044): cards, panels, popovers, dialogs and the icon tile are 4 px. Calcite's default stays on inputs and buttons. */
+  --dc-radius: 4px;
+  --dc-radius-s: 4px;
+  --dc-radius-m: 4px;
+  --dc-radius-l: 14px;
+  /* The brand angle (matches the logo). Used only as an accent: an angled edge on hero bands (see prototype D). */
+  --dc-brand-angle: 247.5deg;
+
+  /* Motion */
+  --dc-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dc-dur-fast: 120ms;
+  --dc-dur-med: 200ms;
+  --dc-dur-slow: 320ms;
+
+  /* Calcite */
+  --calcite-font-family: var(--dc-font-sans);
+  --calcite-font-family-code: var(--dc-font-mono);
+  --calcite-card-corner-radius: var(--dc-radius);
+  --calcite-panel-corner-radius: var(--dc-radius);
+  --calcite-popover-corner-radius: var(--dc-radius);
+  --calcite-alert-corner-radius: var(--dc-radius);
+  --calcite-dialog-corner-radius: var(--dc-radius);
+}
+
+/* ---------- Light scheme (default) ---------- */
+:root,
+.calcite-mode-light,
+.calcite-mode-auto {
+  --dc-bg: #f5f8fa;            /* neutral-50 */
+  --dc-surface: #ffffff;
+  --dc-surface-raised: #ffffff;
+  --dc-text: var(--dc-midnight); /* 15.84:1 on white */
+  --dc-text-muted: #4a5b66;    /* 6.6:1 on bg, 7.1:1 on surface */
+  --dc-border: #d5dee5;
+  --dc-accent: var(--dc-brand-500);   /* Boustead Blue; white text 7.63:1 */
+  --dc-accent-contrast: #ffffff;
+  --dc-success: var(--dc-pine);       /* 6.24:1 on white. Good outcomes only. */
+  --dc-warning: #8a5a00;              /* AA text on white (Amber itself is 1.99:1); a darkened Amber, text only */
+  --dc-danger: var(--dc-raspberry);   /* 6.59:1 on white */
+  --dc-shadow-1: 0 1px 2px rgba(9, 35, 64, 0.08), 0 1px 1px rgba(9, 35, 64, 0.04);
+  --dc-shadow-2: 0 8px 24px rgba(9, 35, 64, 0.12);
+  --dc-shadow-header: 0 1px 0 rgba(9, 35, 64, 0.06), 0 2px 8px rgba(9, 35, 64, 0.08); /* DC-092 header D */
+
+  /* Calcite mapping */
+  --calcite-color-brand: var(--dc-accent);
+  --calcite-color-brand-hover: var(--dc-brand-600);
+  --calcite-color-brand-press: var(--dc-brand-700);
+  --calcite-color-brand-underline: rgba(27, 81, 163, 0.4);
+  --calcite-color-text-link: var(--dc-brand-500);
+  --calcite-color-text-inverse: #ffffff;
+  --calcite-color-background: var(--dc-bg);
+  --calcite-color-foreground-1: var(--dc-surface);
+  --calcite-color-foreground-2: var(--dc-neutral-50);
+  --calcite-color-foreground-3: var(--dc-neutral-100);
+  --calcite-color-text-1: var(--dc-text);
+  --calcite-color-text-2: var(--dc-neutral-700);   /* 10.2:1 on foreground-1 */
+  --calcite-color-text-3: var(--dc-text-muted);    /* 6.1:1 on foreground-2/3 */
+  --calcite-color-border-1: var(--dc-border);
+  --calcite-color-border-2: var(--dc-neutral-300); /* decorative */
+  --calcite-color-border-3: var(--dc-neutral-500); /* 4.3:1 on bg, UI boundary */
+}
+
+/* ---------- Dark scheme: OS preference (unless forced light) ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not(.calcite-mode-light),
+  .calcite-mode-auto {
+    --dc-bg: #151a1f;
+    --dc-surface: #1c2229;
+    --dc-surface-raised: #232a32;
+    --dc-text: #eef2f6;
+    --dc-text-muted: #9fadba;
+    --dc-border: #343e48;
+    --dc-accent: var(--dc-brand-300);        /* 60% tint of Boustead Blue; Midnight text on it */
+    --dc-accent-contrast: var(--dc-midnight);
+    --dc-success: #eef2f6;     /* tertiaries can't be tinted: neutral text, Pine appears as a solid mark only */
+    --dc-warning: var(--dc-amber);
+    --dc-danger: #eef2f6;      /* same: Raspberry appears as a solid mark only */
+    --dc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --dc-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --dc-shadow-header: 0 1px 0 rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+
+    --calcite-color-brand: var(--dc-accent);
+    --calcite-color-brand-hover: var(--dc-brand-200);
+    --calcite-color-brand-press: var(--dc-brand-100);
+    --calcite-color-brand-underline: rgba(118, 151, 200, 0.4);
+    --calcite-color-text-link: var(--dc-brand-200);
+    --calcite-color-text-inverse: var(--dc-midnight);
+    --calcite-color-background: var(--dc-bg);
+    --calcite-color-foreground-1: var(--dc-surface);
+    --calcite-color-foreground-2: var(--dc-surface-raised);
+    --calcite-color-foreground-3: #2c353e;
+    --calcite-color-text-1: var(--dc-text);
+    --calcite-color-text-2: #c4ced8;
+    --calcite-color-text-3: var(--dc-text-muted);
+    --calcite-color-border-1: var(--dc-border);
+    --calcite-color-border-2: #46525e;
+    --calcite-color-border-3: #6a7886;
+  }
+}
+
+/* ---------- Dark scheme: explicit class (Calcite mode switch) ---------- */
+.calcite-mode-dark {
+  --dc-bg: #151a1f;
+  --dc-surface: #1c2229;
+  --dc-surface-raised: #232a32;
+  --dc-text: #eef2f6;
+  --dc-text-muted: #9fadba;
+  --dc-border: #343e48;
+  --dc-accent: var(--dc-brand-300);
+  --dc-accent-contrast: var(--dc-midnight);
+  --dc-success: #eef2f6;
+  --dc-warning: var(--dc-amber);
+  --dc-danger: #eef2f6;
+  --dc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --dc-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --dc-shadow-header: 0 1px 0 rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+
+  --calcite-color-brand: var(--dc-accent);
+  --calcite-color-brand-hover: var(--dc-brand-200);
+  --calcite-color-brand-press: var(--dc-brand-100);
+  --calcite-color-brand-underline: rgba(118, 151, 200, 0.4);
+  --calcite-color-text-link: var(--dc-brand-200);
+  --calcite-color-text-inverse: var(--dc-midnight);
+  --calcite-color-background: var(--dc-bg);
+  --calcite-color-foreground-1: var(--dc-surface);
+  --calcite-color-foreground-2: var(--dc-surface-raised);
+  --calcite-color-foreground-3: #2c353e;
+  --calcite-color-text-1: var(--dc-text);
+  --calcite-color-text-2: #c4ced8;
+  --calcite-color-text-3: var(--dc-text-muted);
+  --calcite-color-border-1: var(--dc-border);
+  --calcite-color-border-2: #46525e;
+  --calcite-color-border-3: #6a7886;
+}
+
+/* Semantic status colours (ADR 0006), shared by the review components and the Sankey. Ported from prototype D.
+   stale = Raspberry (solid marks only) | at risk = Amber (tints allowed) | disabled = Midnight outline
+   reclaimable = Pine Green (good outcomes only) | nudged = slate, neutral history. Boustead Blue is never a status. */
+:root {
+  --dc-stale-solid: var(--dc-raspberry);
+  --dc-risk: var(--dc-midnight); --dc-risk-tint: var(--dc-amber-20); --dc-risk-solid: var(--dc-amber);
+  --dc-inactive: var(--dc-midnight); --dc-inactive-line: var(--dc-midnight);
+  --dc-reclaim-solid: var(--dc-pine);
+  --dc-nudged: #34434f; --dc-nudged-tint: #e9eff3;
+  --dc-dot-pending: #dfe6ec; --dc-dot-found: #b5c2cc; --dc-dot-fine: #9fb2c0;
+  --dc-page: #f3f6fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.calcite-mode-light) {
+    --dc-risk: var(--dc-amber); --dc-risk-tint: rgba(250, 166, 26, 0.16);
+    --dc-inactive: #eef2f6; --dc-inactive-line: var(--dc-brand-200);
+    --dc-nudged: #c4ced8; --dc-nudged-tint: #2c353e;
+    --dc-dot-pending: #232a32; --dc-dot-found: #46525e; --dc-dot-fine: #6a7886;
+  }
+}
+
+/* DC-120 (FB-81): stacking scale. The account popover lives inside the app header, so the header's stacking context must
+   outrank everything that paints under it: our own sticky bars (2 to 6) and Calcite's panel and sticky headers
+   (--calcite-z-index-sticky 300, --calcite-z-index-header 400; calcite-panel is not a stacking context, so those
+   z-indexes compete with the app header directly). It stays below Calcite toasts (500), dropdowns (600), overlays
+   (700), dialogs (800) and popups (900), and the tour overlay. */
+:root { --dc-z-header: 450; }

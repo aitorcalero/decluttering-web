@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dc-sankey demo</title>
+  <link rel="stylesheet" href="/src/styles/tokens.css">
+</head>
+<body class="calcite-mode-auto" style="max-width: 900px; margin: 1rem auto; font-family: var(--dc-font-sans, system-ui)">
+  <dc-sankey id="sk"></dc-sankey>
+  <p id="log" style="color: gray"></p>
+  <script type="module">
+    import '@esri/calcite-components/dist/calcite/calcite.css';
+    import { setAssetPath } from '@esri/calcite-components/dist/components';
+    import '/src/ui/sankey/dc-sankey.ts';
+    import { evaluate, PRESETS } from '/src/domain/stale.ts';
+    setAssetPath('https://js.arcgis.com/calcite-components/3.3.3/assets');
+    const data = await (await fetch('/demo/mock-small.json')).json();
+    const sk = document.getElementById('sk');
+    sk.owners = evaluate(data, PRESETS.balanced).owners;
+    sk.addEventListener('dc-owner-select', (e) => {
+      sk.selected = e.detail.owner;
+      document.getElementById('log').textContent = 'dc-owner-select: ' + e.detail.owner;
+    });
+  </script>
+</body>
+</html>

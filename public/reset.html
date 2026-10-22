@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start fresh · Decluttering</title>
+  <style>
+    :root { color-scheme: light; --text: #092340; --muted: #4a5a6a; --brand: #1a4b9c; --line: #d8e0e8; }
+    body { margin: 0; background: #f3f6fb; color: var(--text); font: 16px/1.5 system-ui, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 36rem; margin: 3rem auto; padding: 0 16px; }
+    h1 { font-size: 1.5rem; font-weight: 500; margin: 0 0 0.5rem; }
+    p { margin: 0.5rem 0; color: var(--muted); }
+    #status { margin: 1rem 0 1.5rem; padding: 0.75rem 1rem; background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: 4px; color: var(--text); }
+    ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+    a { display: block; padding: 0.75rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 4px; color: var(--brand); text-decoration: none; font-weight: 500; }
+    a:hover, a:focus-visible { border-color: var(--brand); outline: none; }
+    a small { display: block; font-weight: 400; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Start fresh</h1>
+  <p>This clears what Decluttering keeps in this browser: the saved scan, your settings, "don't show again" choices and the sign-in for this tab. Nothing in ArcGIS Online is touched.</p>
+  <div id="status" role="status">Clearing…</div>
+  <ul>
+    <li><a href="./">Real app, from the start<small>Landing page and sign-in</small></a></li>
+    <li><a href="./#/demo">Real app, demo review<small>No sign-in; mock data</small></a></li>
+  </ul>
+</main>
+<script>
+  // Only Decluttering's own keys (prefixes below) and its IndexedDB database; nothing else on this origin.
+  const PREFIXES = ['decluttering', 'dc-', 'dc.'];
+  const wipe = (store) => {
+    let n = 0;
+    try {
+      const keys = [];
+      for (let i = 0; i < store.length; i++) keys.push(store.key(i));
+      for (const k of keys) if (k && PREFIXES.some((p) => k.startsWith(p))) { store.removeItem(k); n++; }
+    } catch { /* storage unavailable */ }
+    return n;
+  };
+  const removed = wipe(localStorage) + wipe(sessionStorage);
+  const done = (msg) => { document.getElementById('status').textContent = msg; };
+  try {
+    const req = indexedDB.deleteDatabase('decluttering');
+    req.onsuccess = () => done(`All clear: ${removed} saved setting${removed === 1 ? '' : 's'} and the saved scan removed. Pick where to start.`);
+    req.onerror = () => done(`Settings cleared (${removed}), but the saved scan could not be removed. Close other Decluttering tabs and reload this page.`);
+    req.onblocked = () => done(`Settings cleared (${removed}). The saved scan is still open in another tab: close it and reload this page.`);
+  } catch {
+    done(`Settings cleared (${removed}). This browser has no saved scan storage.`);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/* DC-064: the scan screen (dc-scan-screen, dc-dot-map), ported from prototypes/d-converged/scan.css and style.css. Light only. */
+.scan-page { display: grid; gap: 1rem; }
+.scan-page h1 { font-family: var(--dc-font-display); font-size: 1.5rem; line-height: 1.2; font-weight: 400; color: var(--dc-text); margin: 0; }
+.scan-page .lede { margin: 0.25rem 0 0; color: var(--calcite-color-text-2); max-width: 62ch; line-height: 1.5; }
+.scan-page, .scan-page > * { min-width: 0; }
+
+.scan-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .scan-grid { grid-template-columns: 1fr; } }
+.scan-grid calcite-panel { height: auto; }
+.dots-wrap { padding: 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.side { display: grid; gap: 1rem; }
+.side > * { margin-block: 0; } /* Calcite blocks carry an 8 px top margin; the side column top-aligns with the dot map card */
+.big { font-family: var(--dc-font-display); font-size: 2.5rem; line-height: 1.1; font-weight: 400; color: var(--dc-text); font-variant-numeric: tabular-nums; }
+.big-sub { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--calcite-color-text-3); font-variant-numeric: tabular-nums; }
+.block-pad { padding: 0.25rem 0.75rem 0.75rem; }
+.phase-icon { color: var(--calcite-color-text-3); }
+.phase-icon.done { color: var(--calcite-color-brand); }
+.scan-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.scan-helper { flex-basis: 100%; margin: 0; font-size: 0.85rem; color: var(--calcite-color-text-2); }
+.scan-error { display: grid; gap: 0.5rem; justify-items: start; }
+.scan-error p { margin: 0; color: var(--dc-danger, #b3261e); }
+.scan-page .note { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0; padding: 0.55rem 0.75rem; font-size: 0.85rem; line-height: 1.4; color: var(--calcite-color-text-2); background: var(--dc-brand-50); border: 1px solid var(--dc-brand-100); border-radius: var(--dc-radius); }
+.scan-page .note calcite-icon { color: var(--dc-boustead-blue); flex: none; margin-top: 0.1rem; }
+.scan-page .note strong { display: block; color: var(--dc-midnight); font-weight: 500; }
+
+/* dot map */
+dc-dot-map { display: block; }
+.dm-wrap { display: flex; flex-direction: column; gap: 0.7rem; }
+.dm-lens { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.9rem; }
+.dm-lens-note { font-size: 0.82rem; color: var(--calcite-color-text-2); }
+.dm-stage { position: relative; }
+.dm-stage canvas { width: 100%; display: block; border-radius: 4px; outline-offset: 2px; }
+.dm-stage canvas:focus-visible { outline: 2px solid var(--dc-brand-500, #1b6ea8); }
+.dm-tip {
+  position: absolute; left: 0; top: 0; z-index: 3; width: max-content; max-width: 260px;
+  display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.6rem; pointer-events: none;
+  background: #fff; color: var(--calcite-color-text-1); border: 1px solid #d6dee5; border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(10, 37, 64, 0.16); font-size: 0.8rem; line-height: 1.35;
+}
+.dm-tip[hidden] { display: none; }
+.dm-tip.is-pinned { pointer-events: auto; } /* only a tapped tip holds a link (FB-26) */
+.dm-t-hint { margin-top: 0.2rem; font-size: 0.74rem; color: var(--calcite-color-text-3); }
+.dm-tip strong { font-size: 0.88rem; overflow-wrap: anywhere; }
+.dm-t-owner { color: var(--calcite-color-text-2); }
+.dm-t-row { font-variant-numeric: tabular-nums; }
+.dm-t-why { color: var(--calcite-color-text-2); margin-top: 0.1rem; }
+.dm-tip a { margin-top: 0.3rem; font-weight: 600; color: var(--calcite-color-text-link, #1b6ea8); text-decoration: none; }
+.dm-tip a:hover, .dm-tip a:focus-visible { text-decoration: underline; }
+@media (prefers-reduced-motion: no-preference) { .dm-tip:not([hidden]) { animation: dm-in 120ms ease-out; } }
+@keyframes dm-in { from { opacity: 0; } to { opacity: 1; } }
+.dm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.dm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.4rem; font-size: 0.8rem; color: var(--calcite-color-text-2); }
+.dm-lg { display: inline-flex; align-items: center; gap: 0.35rem; }
+.dm-ramp { display: block; width: 7rem; height: 0.6rem; border-radius: 3px; }
+.dm-lg:first-child { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+.dm-ramp-labels { display: flex; justify-content: space-between; font-size: 0.7rem; }
+.dm-small { gap: 0.4rem; }
+/* FB-42: a link, just slightly stronger than the text around it (weight, a little offset); never a filled button. */
+.dm-link { font: inherit; font-weight: 600; color: var(--calcite-color-brand, #0064a5); background: none; border: 0; padding: 0.15rem 0.2rem; margin: 0; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; border-radius: 2px; }
+.dm-link:hover { color: var(--calcite-color-brand-hover, #004874); text-decoration-thickness: 2px; }
+.dm-link:focus-visible { outline: 2px solid var(--calcite-color-brand, #0064a5); outline-offset: 2px; }
+.dm-grey, .dm-pending { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: #9fb2c0; display: inline-block; }
+.dm-pending { background: #dfe6ec; }
+.dm-sz { display: inline-block; border-radius: 50%; background: #9fb2c0; }
+.dm-sz.s { width: 0.4rem; height: 0.4rem; } .dm-sz.l { width: 0.85rem; height: 0.85rem; } .dm-sz.m { width: 0.6rem; height: 0.6rem; }
+.dm-ringed { outline: 1.5px solid #1b3a57; outline-offset: 1.5px; }
+
+.dm-foot { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0.2rem 0 0; padding-top: 0.7rem; border-top: 1px solid #e3e9ee; font-size: 0.8rem; color: var(--calcite-color-text-2); }
+.dm-foot calcite-icon { color: var(--dc-pine, #2e7d5b); flex: none; margin-top: 0.1rem; }
+
+/* the review's "still checking" line (DC-064: percent and estimate, no tips) */
+[data-scan="background"] .scan-meta { color: var(--calcite-color-text-2); font-variant-numeric: tabular-nums; }
+
+/* DC-071b: progress band (one line, one bar, percent and estimate, the crawl line) with the actions beside it */
+.scan-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; padding: 0.85rem 1rem; background: var(--calcite-color-foreground-1, #fff); border: 1px solid var(--dc-neutral-200); border-radius: var(--dc-radius); }
+.sp-main { flex: 1 1 22rem; display: grid; gap: 0.4rem; min-width: 0; }
+.sp-line { font-size: 0.95rem; color: var(--calcite-color-text-1); min-height: 1.3em; font-variant-numeric: tabular-nums; }
+.sp-bar { display: block; height: 6px; border-radius: 3px; background: var(--dc-neutral-100); overflow: hidden; }
+.sp-bar i { display: block; height: 100%; background: var(--dc-brand-500); transform-origin: left; }
+@media (prefers-reduced-motion: no-preference) { .sp-bar i { transition: transform 400ms ease-out; } }
+.sp-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.85rem; color: var(--calcite-color-text-2); font-variant-numeric: tabular-nums; }
+.sp-crawl { color: var(--calcite-color-text-3); }
+.scan-progress .scan-actions { flex: 0 1 auto; }
+@media (max-width: 600px) { .scan-progress .scan-actions { flex-basis: 100%; } }
+
+/* the big-org card: calm, inline, not a modal (FB-22). DC-090: a genuine notice, so the callout look (tint, 3 px bar, icon) */
+.big-org { display: flex; gap: 0.75rem; align-items: flex-start; padding: 1rem 1.1rem; background: var(--dc-brand-50); border: 0; border-inline-start: 3px solid var(--dc-brand-500); border-radius: var(--dc-radius); }
+.big-org > calcite-icon { color: var(--dc-brand-500); flex: none; margin-top: 0.15rem; }
+.bo-body { display: grid; gap: 0.5rem; min-width: 0; }
+.big-org h2 { margin: 0; font-family: var(--dc-font-display); font-weight: 500; font-size: 1.05rem; color: var(--dc-midnight); }
+.big-org p { margin: 0; line-height: 1.5; color: var(--calcite-color-text-1); max-width: 70ch; }
+.big-org .bo-note { font-size: 0.88rem; color: var(--calcite-color-text-2); }
+.bo-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.15rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .big-org, .wait-card { transition: opacity 300ms ease, translate 300ms ease; }
+  @starting-style { .big-org, .wait-card { opacity: 0; translate: 0 6px; } }
+}
+
+/* "While you wait": tips in a card of their own, tied to the wait (FB-20). Brand colours only: amber means "at risk" (ADR 0006).
+   DC-090 (FB-39): a plain elevated card, no side bar. */
+.wait-card { display: grid; gap: 0.6rem; padding: 0.7rem 0.9rem 0.6rem; background: var(--calcite-color-foreground-1); border: 1px solid var(--dc-card-line); box-shadow: var(--dc-shadow-1); border-radius: var(--dc-radius); }
+.wait-card header { display: flex; flex-wrap: wrap; gap: 0.1rem 0.5rem; align-items: center; }
+.wait-card header calcite-icon { color: var(--dc-brand-500); }
+.wait-card h2 { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dc-midnight); }
+.wc-sub { flex-basis: 100%; font-size: 0.8rem; color: var(--calcite-color-text-2); }
+.wait-card .dc-tip { margin-top: 0; color: var(--calcite-color-text-1); gap: 0.2rem 0.7rem; align-items: flex-start; min-height: 0; }
+/* the tip's own icon (a smile for a joke, a lightbulb for a tip) in a white badge */
+.wait-card .dc-tip > calcite-icon { display: inline-flex; box-sizing: content-box; padding: 0.4rem; border-radius: 50%; background: #fff; border: 1px solid var(--dc-brand-100); color: var(--dc-brand-500); }
+.wait-card .dc-tip .dc-tip-body { line-height: 1.45; flex: 1 1 calc(100% - 3.2rem); min-width: 10rem; }
+.wait-card .dc-tip calcite-action:first-of-type { margin-inline-start: 2.6rem; }
+.wait-card .dc-tip a { color: var(--dc-brand-500); }
+/* FB-28: the swap is animated in dc-tips.ts (Web Animations: fade plus a few px of travel, card height eased). The host clips while its height animates. */
+dc-tips { display: block; overflow: clip; overflow-clip-margin: 4px; }
+.wait-card .dc-tip { overflow-wrap: anywhere; }
+
+/* dot map at scale */
+.dm-shade { width: 0.9rem; height: 0.6rem; border-radius: 2px; background: #9fb2c0; opacity: 0.45; display: inline-block; }
+calcite-segmented-control[disabled] + .dm-lens-note { font-style: italic; }
+.scan-progress .scan-actions { max-width: 26rem; }
+
+/* FB-31: app.css gives the old Stop button margin-top: 0.75rem, which dropped "Stop and review what we have" below "Review now" in the shared row. Same height and baseline now. */
+.scan-progress .scan-actions .stop, .scan-progress .scan-actions calcite-button { margin: 0; }
+.scan-progress .scan-actions { align-items: stretch; }
+@media (max-width: 600px) { .scan-progress .scan-actions { max-width: none; } .scan-progress .scan-actions calcite-button { flex: 1 1 auto; } }

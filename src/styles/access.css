@@ -1,0 +1,22 @@
+/* DC-111: the access checklist. Tokens from tokens.css. Ticks are Pine (--dc-success), crosses a calm neutral, never red. */
+dc-access-checklist { display: block; }
+dc-access-checklist .ac-card {
+  border: 1px solid var(--calcite-color-border-3); border-radius: var(--dc-radius-l); padding: 0.75rem 1rem 0.9rem;
+  background: var(--calcite-color-foreground-1);
+}
+dc-access-checklist .ac-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+dc-access-checklist h2 { font-family: var(--dc-font-display); font-weight: 500; font-size: 1.05rem; margin: 0; color: var(--dc-text); }
+dc-access-checklist .ac-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.1rem; }
+dc-access-checklist .ac-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.6rem; padding: 0.4rem 0; border-top: 1px solid var(--calcite-color-border-3); }
+dc-access-checklist .ac-row:first-child { border-top: 0; }
+dc-access-checklist .ac-icon { color: var(--calcite-color-text-2); }
+dc-access-checklist .ac-text { display: grid; gap: 0.05rem; }
+dc-access-checklist .ac-text span { color: var(--calcite-color-text-2); font-size: 0.9rem; }
+dc-access-checklist .ac-mark { display: inline-flex; }
+dc-access-checklist .ac-mark[data-mark="yes"] { color: var(--dc-success); }
+dc-access-checklist .ac-mark[data-mark="no"], dc-access-checklist .ac-mark[data-mark="neutral"] { color: var(--calcite-color-text-3); }
+dc-access-checklist .ac-summary { margin: 0.5rem 0 0; font-weight: 500; color: var(--dc-text); }
+@supports (transition-behavior: allow-discrete) {
+  dc-access-checklist .ac-card { transition: opacity var(--dc-dur-fast) var(--dc-ease-out); @starting-style { opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) { dc-access-checklist .ac-card { transition: none; } }

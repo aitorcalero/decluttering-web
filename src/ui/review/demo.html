@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dc-review demo</title>
+  <link rel="stylesheet" href="/src/styles/tokens.css">
+</head>
+<body class="calcite-mode-auto" style="margin: 0; background: var(--dc-page); font-family: var(--dc-font-sans, system-ui)">
+  <main style="max-width: 1250px; margin: 0 auto; padding: 1rem 1.5rem 2rem">
+    <p style="color: gray; font-size: 0.85rem">Mode: <a href="?">admin</a> · <a href="?mode=admin-cant-send">admin-cant-send</a> · <a href="?mode=my-items">my-items</a> · <a href="?usage=0">no usage</a></p>
+    <dc-review id="rv">
+      <dc-sankey id="sk" slot="chart"></dc-sankey>
+    </dc-review>
+    <p id="log" style="color: gray; font-size: 0.85rem"></p>
+  </main>
+  <script type="module">
+    import '@esri/calcite-components/dist/calcite/calcite.css';
+    import { setAssetPath } from '@esri/calcite-components/dist/components';
+    import '/src/styles/tokens.css';
+    import '/src/ui/sankey/dc-sankey.ts';
+    import '/src/ui/review/dc-review.ts';
+    import { evaluate, PRESETS } from '/src/domain/stale.ts';
+    setAssetPath('https://js.arcgis.com/calcite-components/3.3.3/assets');
+    const q = new URLSearchParams(location.search);
+    const data = await (await fetch('/demo/mock-small.json')).json();
+    const rv = document.getElementById('rv'), sk = document.getElementById('sk');
+    const mode = q.get('mode') || 'admin';
+    rv.data = data; rv.org = data.org; rv.mode = mode; rv.canSeeUsage = q.get('usage') !== '0';
+    if (mode === 'my-items') {
+      const top = evaluate(data, PRESETS.balanced).owners[0];
+      rv.memberUsername = top ? top.owner.username : '';
+    }
+    const refresh = (t) => { sk.owners = evaluate(data, t).owners; };
+    refresh(PRESETS.balanced);
+    rv.addEventListener('dc-thresholds-change', (e) => refresh(e.detail));
+    rv.addEventListener('dc-owner-select', () => queueMicrotask(() => { sk.selected = rv.filterOwner; }));
+    rv.addEventListener('dc-selection-change', (e) => {
+      document.getElementById('log').textContent = 'dc-selection-change: ' + e.detail.owners.length + ' owners, ' + e.detail.items.length + ' items';
+    });
+  </script>
+</body>
+</html>
