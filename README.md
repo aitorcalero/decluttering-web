@@ -136,9 +136,9 @@ flowchart LR
 
 ![Your data: your browser talks only to your own ArcGIS Online org](docs/images/about-data.png)
 
-## This hosted copy is review-only
+## This hosted copy is review-only (for now)
 
-The public site can scan and review any org you sign in to, but **sending is switched off**: no test emails, no owner emails, no group and no log. Sending is only enabled in builds made for specific orgs, so that nobody can email a whole org by accident. See *Run your own copy*.
+The public site can scan and review any org you sign in to, but **sending is switched off**: no test emails, no owner emails, no group and no log. Sending is planned as a deliberate opt-in by each org's administrator, inside the app, after a test email to themselves. Until then it is only enabled in builds made for specific orgs, so that nobody can email a whole org by accident. See *Run your own copy*.
 
 ## Who can use it
 
@@ -148,7 +148,7 @@ After you sign in, the app shows a short checklist of what your account can do h
 |---|---|
 | Review the whole org | an admin role that can view all items and members (`portal:admin:viewItems`, `portal:admin:viewUsers`) |
 | See "last used" | access to the org's usage reports |
-| Send nudges (own builds) | create groups and add members to them (`portal:user:createGroup`, `portal:admin:assignToGroups`) |
+| Send nudges (own builds today; an in-app opt-in is planned) | create groups and add members to them (`portal:user:createGroup`, `portal:admin:assignToGroups`) |
 | Anyone else | review their own layers |
 
 ## Run your own copy
@@ -178,6 +178,14 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`.
 ## Built with
 
 [Calcite Design System](https://developers.arcgis.com/calcite-design-system/), [ArcGIS REST JS](https://developers.arcgis.com/arcgis-rest-js/), [Lit](https://lit.dev/), [D3](https://d3js.org/) and [Driver.js](https://driverjs.com/), with Vite and TypeScript. Third-party notices: `LICENSES.md`.
+
+## Disclaimer
+
+- Decluttering is an independent, open-source project. It is not an Esri or Esri Australia product, and it is not endorsed or supported by either.
+- It is provided **"as is", without warranty of any kind**, and without liability for any loss or damage, as set out in the Apache License 2.0 (sections 7 and 8). You use it at your own risk.
+- You are responsible for how you use it in your organisation: whose content you review, and any email you choose to send to colleagues. Check that it fits your organisation's policies first, and send yourself a test before anyone else gets an email.
+- The app never deletes, unshares or changes anyone's items. What an owner does after a nudge is their decision.
+- ArcGIS and Esri are trademarks of Esri. They are used here only to describe what the app works with.
 
 ## Support
 
