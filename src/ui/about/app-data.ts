@@ -5,6 +5,7 @@
 import { GROUP_TITLE, type GroupNotifier } from '../../notify';
 import { LOG_TITLE, type NudgeLog } from '../../log';
 import { itemUrl } from '../../domain/format';
+import { TURN_OFF } from '../access/turn-off-copy';
 
 /** What the section needs of the org: its id (the log's cache key) and where its pages live. */
 export interface AppDataOrg { id: string; urlKey: string; customBaseUrl?: string }
@@ -103,12 +104,13 @@ export const COPY = {
   logRow: `Nudge log: ${LOG_TITLE}`,
   logNote: (sends: number | null): string => (sends === null ? 'Who was nudged, and when.' : `${plural(sends, 'send', 'sends')} recorded.`),
   open: 'Open in ArcGIS Online',
-  removeGroup: 'Remove group…',
+  removeGroup: 'Turn off sending (remove your group)',
   deleteLog: 'Delete log…',
   keep: 'Keep it',
-  groupConfirmHeading: 'Remove the hidden group?',
-  groupConfirm: `Only the app's own group goes: “${GROUP_TITLE}”. Nobody's items or accounts are touched. If you send again, we'll ask before creating it again.`,
-  groupConfirmButton: 'Remove group',
+  groupConfirmHeading: TURN_OFF.heading,
+  groupConfirm: TURN_OFF.body,
+  groupConfirmButton: TURN_OFF.yes,
+  groupKeep: TURN_OFF.keep,
   logConfirmHeading: 'Delete the nudge log?',
   logConfirm: (rows: number | null): string =>
     `This deletes the table “${LOG_TITLE}” from your content, with ${rows === null ? 'its rows' : `its ${plural(rows, 'row', 'rows')}`}. ` +

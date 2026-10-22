@@ -65,29 +65,46 @@ describe('canSeeUsage', () => {
 describe('capabilities (DC-111)', () => {
   const view = [...ADMIN_PRIVILEGES], send = [...SEND_PRIVILEGES];
   const ids = (c: ReturnType<typeof capabilities>) => Object.fromEntries(c.items.map((i) => [i.id, i.state]));
-  const cases: Array<[string, string[], boolean, boolean]> = [];
+  const cases: Array<[string, string[], boolean, boolean, boolean]> = [];
   for (const [n, p] of [['none', []], ['view', view], ['send', send], ['both', [...view, ...send]]] as const)
-    for (const u of [false, true]) for (const w of [false, true]) cases.push([n, [...p], u, w]);
+    for (const u of [false, true]) for (const w of [false, true]) for (const o of [false, true]) cases.push([n, [...p], u, w, o]);
 
-  it.each(cases)('privileges %s, usage %s, writable %s', (_n, p, u, w) => {
-    const c = capabilities(p, u, w);
+  it.each(cases)('privileges %s, usage %s, may opt in %s, opted in %s', (_n, p, u, w, o) => {
+    const c = capabilities(p, u, w, o);
     const v = view.every((x) => p.includes(x)), s = send.every((x) => p.includes(x));
-    expect(ids(c)).toEqual({ view: v ? 'yes' : 'no', usage: u ? 'yes' : 'no', send: s ? 'yes' : 'no', 'org-send': w ? 'yes' : 'neutral' });
-    expect(c.level).toBe(!v ? 'mine' : s && w ? 'full' : s ? 'locked' : 'review');
+    // Opting in only counts where the org may opt in at all.
+    expect(ids(c)).toEqual({ view: v ? 'yes' : 'no', usage: u ? 'yes' : 'no', send: s ? 'yes' : 'no', 'org-send': w && o ? 'yes' : 'neutral' });
+    expect(c.level).toBe(!v ? 'mine' : s && w && o ? 'full' : s ? 'locked' : 'review');
     expect(c.summary).toBe(CAPABILITY_SUMMARY[c.level]);
     expect(c.items.every((i) => i.label && i.line)).toBe(true);
   });
 
   it('has a summary line for each mode', () => {
-    expect(capabilities([...view, ...send], true, true).summary).toBe('You’re all set: full review and sending.');
-    expect(capabilities(view, true, true).summary).toBe('Review only: you can look through the whole org, but not send nudges.');
-    expect(capabilities([...view, ...send], true, false).summary).toBe('Review only for now: your account could send, but sending is switched off for this org.');
-    expect(capabilities(undefined, false, true).summary).toMatch(/^Your own layers/);
+    expect(capabilities([...view, ...send], true, true, true).summary).toBe('You’re all set: full review and sending.');
+    expect(capabilities(view, true, true, true).summary).toBe('Review only: you can look through the whole org, but not send nudges.');
+    expect(capabilities([...view, ...send], true, false, false).summary).toBe('Review only for now: your account could send, but sending isn’t turned on for you yet.');
+    expect(capabilities([...view, ...send], true, true, false).summary).toBe('Review only for now: your account could send, but sending isn’t turned on for you yet.');
+    expect(capabilities(undefined, false, true, true).summary).toMatch(/^Your own layers/);
   });
 
-  it('a read-only org is neutral, not a failure', () => {
-    expect(capabilities([...view, ...send], true, false).items.find((i) => i.id === 'org-send')).toMatchObject({ state: 'neutral', label: 'Sending in this org', line: 'Switched off here for now: this org is review-only.' });
-    expect(capabilities([...view, ...send], true, true).items.find((i) => i.id === 'org-send')).toMatchObject({ state: 'yes', line: 'Switched on.' });
+  const row = (w: boolean, o?: boolean) => capabilities([...view, ...send], true, w, o).items.find((i) => i.id === 'org-send');
+  it('where no org may opt in, the row is neutral, calm and has no button', () => {
+    expect(row(false, false)).toMatchObject({ state: 'neutral', label: 'Sending in this org', line: 'Sending isn’t available on this site yet. You can still review everything and write the emails.' });
+    expect(row(false, false)?.action).toBeUndefined();
+    expect(row(false, true)?.state).toBe('neutral');
+    expect(row(false, true)?.action).toBeUndefined();
+  });
+  it('the button only shows for an account that could send (it needs the group privileges)', () => {
+    expect(capabilities(view, true, true, false).items.find((i) => i.id === 'org-send')?.action).toBeUndefined();
+    expect(capabilities(send, true, true, false).items.find((i) => i.id === 'org-send')?.action).toBe('turn-on');
+  });
+  it('where the org may opt in: off for you offers Turn on; on for you offers Turn off instead', () => {
+    expect(row(true, false)).toMatchObject({ state: 'neutral', line: 'Off for you. Turn it on when you’re ready; nothing is sent until you choose.', action: 'turn-on' });
+    expect(row(true)?.action).toBe('turn-on');
+    expect(row(true, true)).toMatchObject({ state: 'yes' });
+    expect(row(true, true)?.line).toMatch(/^On for you\./);
+    expect(row(true, true)?.action).toBe('turn-off');
+    expect(row(true, false)?.line).not.toMatch(/Switched off here for now/);
   });
 
   it('privilegesOfMode agrees with accessMode', () => {

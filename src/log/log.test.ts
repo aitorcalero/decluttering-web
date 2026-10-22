@@ -242,6 +242,21 @@ describe('find-or-create', () => {
   });
 });
 
+describe('ADR 0013: the log follows the sending mode', () => {
+  it('off refuses, list refuses unlisted orgs, opt-in allows any org with an id', () => {
+    const fake = createFakeLogOrg({ self: ME, orgId: ORG });
+    const mk = (o: { sendingMode?: 'off' | 'list' | 'opt-in'; writableOrgIds?: string[]; orgId?: string }) =>
+      () => createNudgeLog({ send: fake.send, portal: FAKE_PORTAL, orgId: o.orgId ?? ORG, sendingMode: o.sendingMode, writableOrgIds: o.writableOrgIds });
+    expect(mk({ sendingMode: 'off', writableOrgIds: [ORG] })).toThrow(WritesDisabled);
+    expect(mk({ sendingMode: 'list', writableOrgIds: ['other'] })).toThrow(WritesDisabled);
+    expect(mk({ sendingMode: 'opt-in', orgId: '' })).toThrow(WritesDisabled);
+    expect(mk({ sendingMode: 'list', writableOrgIds: [ORG] })).not.toThrow();
+    expect(mk({ sendingMode: 'opt-in' })).not.toThrow();
+    expect(() => createSessionNudgeLog(null, { portal: FAKE_PORTAL, orgId: ORG, sendingMode: 'off', writableOrgIds: [ORG], send: fake.send })).toThrow(WritesDisabled);
+    expect(() => createSessionNudgeLog(null, { portal: FAKE_PORTAL, orgId: ORG, sendingMode: 'opt-in', send: fake.send })).not.toThrow();
+  });
+});
+
 describe('DC-096: reading the sends back', () => {
   const make = (rows: Record<string, unknown>[]) => {
     const fake = createFakeLogOrg({ self: ME, orgId: ORG, exists: true, rows });

@@ -25,6 +25,10 @@ export function repoLine(url: string | undefined): { text: string; href: string 
   return { text: REPO_TEXT_LINKED, href: /^https?:\/\//i.test(u) ? u : REPO_URL };
 }
 
+/** Esri's page on the "approved apps" security setting (desk research, ADR 0013). */
+export const APPROVED_APPS_URL = 'https://doc.arcgis.com/en/arcgis-online/administer/configure-security.htm';
+export const APPROVED_APPS_LINK_TEXT = 'Esri: configure organisation security';
+
 /** Small diagrams drawn with Calcite icons. Each renders as one role="img" whose aria-label is `label`. */
 export const FLOWS: Record<FlowId, Flow> = {
   email: {
@@ -132,6 +136,16 @@ export const ABOUT_SECTIONS: AboutSection[] = [
     lead: "To see what uses each layer, the scan looks inside every map and app. It never touches the layers' data.",
     detail: [
       { p: 'Looking inside a map or app adds one view to it, the first time. Later scans only re-read the maps and apps that have changed since.' },
+    ],
+  },
+  {
+    id: 'approved',
+    title: 'For administrators: approving Decluttering',
+    lead: 'If your organisation only lets members sign in to approved apps, Decluttering needs to be on that list first.',
+    detail: [
+      { p: "Where: ArcGIS Online › Organization › Settings › Security › Approved apps. If a label differs in your version, look for the Approved apps list in your organisation's security settings." },
+      { p: 'What: add Decluttering to the list. It is a browser-only app: it reads your org to build the review, and it only creates anything if an admin turns on sending for themselves.' },
+      { p: "We'll add exact steps here once we've confirmed them in an organisation with this setting on." },
     ],
   },
   {

@@ -2,9 +2,11 @@
 // Filled at scan time (a read of the app's own table, if there is one) and after each logged send; the review reads it.
 // DC-096: a full read (a LogRead) also carries the sends, kept here for the review's "Since your nudges" card.
 import type { LoggedSend } from '../domain/types';
+import type { NudgeSource } from './rows';
 
 const byOrg = new Map<string, Map<string, string>>();
 const sendsByOrg = new Map<string, readonly LoggedSend[]>();
+const sourcesByOrg = new Map<string, { by: ReadonlyMap<string, NudgeSource>; othersUnreadable: boolean }>();
 const listeners = new Set<() => void>();
 
 /** A plain map (a send shown at once) keeps the sends already known; a full read replaces them. */
@@ -13,6 +15,14 @@ export function setNudgeLog(orgId: string, latest: ReadonlyMap<string, string> &
   if (Array.isArray(latest.sends)) sendsByOrg.set(orgId, [...latest.sends]);
   listeners.forEach((f) => f());
 }
+
+/** DC-125c: who each owner's latest nudge came from (you or another admin), and whether another admin's log could not be read. */
+export function setNudgeSources(orgId: string, by: ReadonlyMap<string, NudgeSource>, othersUnreadable: boolean): void {
+  sourcesByOrg.set(orgId, { by: new Map(by), othersUnreadable });
+  listeners.forEach((f) => f());
+}
+export const getNudgeSources = (orgId: string): ReadonlyMap<string, NudgeSource> | undefined => sourcesByOrg.get(orgId)?.by;
+export const getOthersUnreadable = (orgId: string): boolean => sourcesByOrg.get(orgId)?.othersUnreadable ?? false;
 
 /** The org's logged sends (test rows left out), or undefined when no log was read. */
 export const getNudgeSends = (orgId: string): readonly LoggedSend[] | undefined => sendsByOrg.get(orgId);
@@ -36,9 +46,9 @@ export function onNudgeLogChange(f: () => void): () => void {
 
 /** ADR 0012: the log was deleted, so what it said is gone with it. Drops this org's cached rows and summary. */
 export function forgetNudgeLog(orgId: string): void {
-  byOrg.delete(orgId); sendsByOrg.delete(orgId); summaryByOrg.delete(orgId);
+  byOrg.delete(orgId); sendsByOrg.delete(orgId); sourcesByOrg.delete(orgId); summaryByOrg.delete(orgId);
   listeners.forEach((f) => f());
 }
 
 /** Tests only. */
-export function clearNudgeLogs(): void { byOrg.clear(); sendsByOrg.clear(); summaryByOrg.clear(); listeners.forEach((f) => f()); }
+export function clearNudgeLogs(): void { byOrg.clear(); sendsByOrg.clear(); sourcesByOrg.clear(); summaryByOrg.clear(); listeners.forEach((f) => f()); }

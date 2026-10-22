@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDigest, emailWhy, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, TONES, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow } from './digest';
+import { buildDigest, emailWhy, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, FOOTER_SITE, SITE_URL, TONES, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow } from './digest';
 
 const row = (id: string, priority: EmailRow['priority'], credits = 1, extra: Partial<EmailRow> = {}): EmailRow => ({
   id, title: `Item ${id}`, url: `https://example.maps.arcgis.com/home/item.html?id=${id}`, credits, sizeKnown: true,
@@ -48,11 +48,22 @@ describe('digest per owner', () => {
     expect(buildDigest(owner([row('a', 'look')]), friendly, ctx, { test: true }).subject).toMatch(/^\[Test\] Jo, 1 of/);
   });
 
-  it('only links to the item pages, with no app link', () => {
+  it('links only to the item pages; the footer names the site in plain text, not a link (FB-16, TC4)', () => {
     const html = emailHtml(TONES.brief.html, owner([row('a', 'look')]), ctx);
     const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
     expect(links).toEqual(['https://example.maps.arcgis.com/home/item.html?id=a']);
+    expect(FOOTER_SITE).toBe('text');
+    expect(html).toContain('with Decluttering (simongis.github.io/decluttering-web), a free tool');
+    expect(html).not.toContain('https://simongis.github.io');
     expect(html).toContain('Sent by Sam Admin from Test Org');
+  });
+
+  it('can link the site, or leave it out (ArcGIS refused the link in the dev org, COM_1132)', () => {
+    const linked = emailHtml(TONES.brief.html, owner([row('a', 'look')]), ctx, { site: 'link' });
+    expect(linked).toContain(`href="${SITE_URL}"`);
+    const off = emailHtml(TONES.brief.html, owner([row('a', 'look')]), ctx, { site: 'off' });
+    expect(off).not.toContain('simongis.github.io');
+    expect(off).toContain('with Decluttering, a free tool');
   });
 
   it('skips the credits note for an item whose size is not measured', () => {

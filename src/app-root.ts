@@ -19,7 +19,7 @@ import { buildDots, type DotModel, type EarlyUsage, type FoundItem } from './ui/
 import './ui/scan/dc-scan-screen';
 import { beginSignIn, fetchUserThumbnail, handleRedirect, isOAuthReturn, loadAccess, loadSession, signOut, takeReturnTo, type AccessInfo } from './auth/session';
 import { canSeeUsage } from './auth/access';
-import { READ_ONLY_NOTE } from './auth/write-allowed';
+import { SENDING_UNAVAILABLE_LINE } from './auth/access';
 import { CLIENT_ID } from './auth/config';
 import type { RequestFn } from './scan/types';
 import { mergeUsageWindow } from './scan/pipeline';
@@ -29,6 +29,10 @@ import '@esri/calcite-components/dist/components/calcite-avatar';
 import '@esri/calcite-components/dist/components/calcite-popover';
 import './ui/about';
 import './ui/access/dc-access-checklist';
+import './ui/emails/dc-turn-on-sending';
+import './ui/access/dc-turn-off-sending';
+import '@esri/calcite-components/dist/components/calcite-alert';
+import { TURN_OFF, turnOffSending } from './ui/access/turn-off';
 import './ui/steps/dc-steps';
 import { stepsFor, type StepId } from './ui/steps/steps';
 import { createSessionNotifier, WritesDisabled, type GroupNotifier } from './notify';
@@ -76,6 +80,15 @@ export class AppRoot extends LitElement {
   /** DC-111: the access checklist card on the scan screen (once per sign-in) and its dialog from the user menu. */
   @state() private accessCard = false;
   @state() private accessOpen = false;
+  /** ADR 0013: this admin has turned sending on (their own app group exists). Read when the checklist is shown. */
+  @state() private sendingOn = false;
+  @state() private turnOnOpen = false;
+  @state() private turnOnBusy = false;
+  @state() private turnOnError = '';
+  @state() private turnOffOpen = false;
+  @state() private turnOffBusy = false;
+  @state() private turnOffError = '';
+  @state() private offToast = false;
   /** DC-098: phones (600 px or less) show the avatar only. */
   private narrowQuery = window.matchMedia('(max-width: 600px)');
   @state() private narrow = this.narrowQuery.matches;
@@ -228,6 +241,7 @@ export class AppRoot extends LitElement {
       this.access = await loadAccess(manager);
       this.orgName = this.access.orgName;
       this.accessCard = true;
+      void this.refreshSendingOn();
       void this.loadThumbnail(manager, this.access);
       if (ret.kind === 'signed-in' || this.route === 'landing') this.navigate('app');
       else if (this.route === 'review' || this.route === 'emails') this.navigate('app');
@@ -532,6 +546,10 @@ export class AppRoot extends LitElement {
     this.thumbUrl = '';
     this.userOpen = false;
     this.accessCard = this.accessOpen = false;
+    this.sendingOn = this.turnOnOpen = this.turnOnBusy = false;
+    this.turnOnError = '';
+    this.turnOffOpen = this.turnOffBusy = this.offToast = false;
+    this.turnOffError = '';
     this.reviewMounted = false;
     document.title = APP_TITLE;
     this.navigate('landing');
@@ -583,7 +601,7 @@ export class AppRoot extends LitElement {
               ${demo ? html`
                 <calcite-button data-action="leave-demo" width="full" appearance="outline" icon-start="sign-out" @click=${() => { this.userOpen = false; this.navigate('landing'); }}>Leave the demo</calcite-button>`
               : html`
-                <calcite-button data-action="access-open" width="full" appearance="transparent" icon-start="question" @click=${() => { this.userOpen = false; this.accessOpen = true; }}>What can I do here?</calcite-button>
+                <calcite-button data-action="access-open" width="full" appearance="transparent" icon-start="question" @click=${() => { this.userOpen = false; this.accessOpen = true; void this.refreshSendingOn(); }}>What can I do here?</calcite-button>
                 <calcite-button data-action="sign-out-keep" width="full" appearance="outline" icon-start="sign-out" @click=${() => this.doSignOut(false)}>Sign out</calcite-button>
                 <calcite-button data-action="sign-out-clear" width="full" appearance="transparent" icon-start="trash" @click=${() => this.doSignOut(true)}>Sign out and clear saved data</calcite-button>
                 <p class="dc-user-hint">Clearing removes saved scans and settings from this browser. Nothing in your org changes.</p>`}
@@ -647,7 +665,7 @@ export class AppRoot extends LitElement {
     return html`
       <dc-scan-screen .mode=${a.mode} .orgName=${a.orgName} .fullName=${a.fullName} .flow=${this.flow.state}
         .stages=${this.stages} .model=${this.dots} .org=${this.data?.org ?? { urlKey: '' }} .eta=${this.eta} .notify=${this.notify}
-        .aside=${this.accessCard && !this.demoOrg ? html`<dc-access-checklist dismissible announce .mode=${a.mode} .usageReadable=${a.usageReadable} .writable=${a.writable} .email=${a.email} @dc-access-dismiss=${() => { this.accessCard = false; }}></dc-access-checklist>` : nothing}
+        .aside=${this.accessCard && !this.demoOrg ? html`<dc-access-checklist dismissible announce .mode=${a.mode} .usageReadable=${a.usageReadable} .mayOptIn=${a.writable} .optedIn=${this.sendingOn} .email=${a.email} @dc-turn-on-sending=${this.askTurnOn} @dc-turn-off-sending=${this.askTurnOff} @dc-access-dismiss=${() => { this.accessCard = false; }}></dc-access-checklist>` : nothing}
         .error=${this.scanError} ?depsKnown=${this.depsKnown && this.flow.state !== 'scanning'}
         @dc-scan-notify=${(e: CustomEvent<NotifyChoice>) => { this.notify = e.detail; }}
         @dc-count-sweeps=${(e: CustomEvent<boolean>) => { const id = this.access?.orgId ?? this.data?.org.id; if (id) setCountSweeps(id, e.detail); }}
@@ -677,9 +695,66 @@ export class AppRoot extends LitElement {
     const app = this.appData();
     const a = this.access;
     return html`<div hidden>${under}</div><dc-about .previous=${this.beforeAbout ?? homeRoute('landing', this.signedIn)}
-      .notifier=${app?.notifier ?? null} .nudgeLog=${app?.nudgeLog ?? null} ?writable=${!!app}
+      .notifier=${app?.notifier ?? null} .nudgeLog=${app?.nudgeLog ?? null} ?writable=${!!app} @dc-app-data-removed=${(e: CustomEvent<{ what: string }>) => { if (e.detail.what === 'group') this.sendingOn = false; }}
       .org=${a ? { id: a.orgId, urlKey: a.urlKey ?? '', customBaseUrl: a.customBaseUrl } : null}></dc-about>`;
   }
+
+  /** ADR 0013: is this admin opted in? A read: their own app group exists. Unknown or any failure counts as not yet. */
+  private async refreshSendingOn(): Promise<void> {
+    const a = this.access, n = this.appData()?.notifier;
+    if (!a || !n) { this.sendingOn = false; return; }
+    try {
+      const r = await n.canCreateGroup();
+      if (r.ok) await n.findGroup();
+      if (this.access === a) this.sendingOn = r.ok && !!n.group;
+    } catch { /* stays "not yet": the row offers Turn on, which finds or creates the group */ }
+  }
+  /** The checklist's "Turn on sending" opens the warm confirm. Nothing is created until the admin says yes there. */
+  private askTurnOn = (): void => {
+    if (!this.appData()) return;
+    this.turnOnError = '';
+    this.accessOpen = false;
+    this.turnOnOpen = true;
+  };
+  private confirmTurnOn = async (): Promise<void> => {
+    const n = this.appData()?.notifier, a = this.access;
+    if (!n || !a || this.turnOnBusy) return;
+    this.turnOnBusy = true;
+    this.turnOnError = '';
+    try {
+      const r = await n.canCreateGroup();
+      if (!r.ok) throw new Error(`Your ArcGIS Online role doesn’t have ${r.missing || 'the “Create groups” privilege'}, and sending needs one small hidden group.`);
+      await n.createGroup();
+      if (this.access === a) { this.sendingOn = true; this.turnOnOpen = false; }
+    } catch (e) {
+      this.turnOnError = e instanceof Error ? e.message : 'We couldn’t turn sending on just now. You can try again.';
+    } finally {
+      this.turnOnBusy = false;
+    }
+  };
+
+  /** DC-125e: "Turn off sending" opens a calm confirm. Nothing is removed until the admin says yes there. */
+  private askTurnOff = (): void => {
+    if (!this.appData()) return;
+    this.turnOffError = '';
+    this.accessOpen = false;
+    this.turnOffOpen = true;
+  };
+  /** Removes the admin's own app group through the guarded path (ADR 0012). The nudge log is not touched. Failure leaves sending on. */
+  private confirmTurnOff = async (): Promise<void> => {
+    const n = this.appData()?.notifier, a = this.access;
+    if (!n || !a || this.turnOffBusy) return;
+    this.turnOffBusy = true;
+    this.turnOffError = '';
+    try {
+      const r = await turnOffSending(n, { id: a.orgId, urlKey: a.urlKey ?? '', customBaseUrl: a.customBaseUrl });
+      if (this.access !== a) return;
+      if (r.ok) { this.sendingOn = false; this.turnOffOpen = false; this.offToast = true; }
+      else this.turnOffError = r.message;
+    } finally {
+      this.turnOffBusy = false;
+    }
+  };
 
   /**
    * ADR 0012: the session notifier and log for About's "App data in your org", only when signed in to a writable org (never
@@ -710,7 +785,7 @@ export class AppRoot extends LitElement {
       <div ?hidden=${onScan || view === 'emails'}>
       ${this.renderScanStatus()}
       <div data-scan-state=${this.stopped ? 'stopped' : this.background ? 'running' : 'done'} data-read-only=${String(!a.writable)}>
-        ${!a.writable && a.mode !== 'my-items' ? html`<p role="note" data-note="read-only">${READ_ONLY_NOTE}</p>` : nothing}
+        ${!a.writable && a.mode !== 'my-items' ? html`<p role="note" data-note="read-only">${SENDING_UNAVAILABLE_LINE}</p>` : nothing}
         ${renderReview({ data, mode: a.mode, canSeeUsage: canSeeUsage(a.usageReadable), username: a.username, note: this.note, refreshing: this.refreshing, depsKnown: this.depsKnown, stopped: this.stopped, rescan: this.rescanOffer, onRescan: this.rescan })}
       </div>
       </div>` : nothing}
@@ -791,7 +866,12 @@ export class AppRoot extends LitElement {
             href=${hrefOf('about')} label="About Decluttering" ?active=${this.route === 'about'}>${this.narrow ? nothing : 'About'}</calcite-button>
           ${this.renderUser()}
         </calcite-navigation>
-        ${this.access && !this.inDemo ? html`<dc-access-dialog ?open=${this.accessOpen} .mode=${this.access.mode} .usageReadable=${this.access.usageReadable} .writable=${this.access.writable} .email=${this.access.email} @dc-access-close=${() => { this.accessOpen = false; }}></dc-access-dialog>` : nothing}
+        ${this.access && !this.inDemo ? html`<dc-access-dialog ?open=${this.accessOpen} .mode=${this.access.mode} .usageReadable=${this.access.usageReadable} .mayOptIn=${this.access.writable} .optedIn=${this.sendingOn} .email=${this.access.email} @dc-turn-on-sending=${this.askTurnOn} @dc-turn-off-sending=${this.askTurnOff} @dc-access-close=${() => { this.accessOpen = false; }}></dc-access-dialog>
+        <dc-turn-on-sending .open=${this.turnOnOpen} .busy=${this.turnOnBusy} .error=${this.turnOnError} @dc-turn-on-close=${() => { if (!this.turnOnBusy) this.turnOnOpen = false; }} @dc-turn-on-confirm=${this.confirmTurnOn}></dc-turn-on-sending>
+        <dc-turn-off-sending .open=${this.turnOffOpen} .busy=${this.turnOffBusy} .error=${this.turnOffError} @dc-turn-off-close=${() => { if (!this.turnOffBusy) this.turnOffOpen = false; }} @dc-turn-off-confirm=${this.confirmTurnOff}></dc-turn-off-sending>
+        <calcite-alert kind="success" icon="check-circle" auto-close auto-close-duration="medium" placement="bottom" label="Notice" .open=${this.offToast} @calciteAlertClose=${() => { this.offToast = false; }}>
+          <div slot="message" data-toast="turn-off">${this.offToast ? TURN_OFF.done : nothing}</div>
+        </calcite-alert>` : nothing}
         <main style="padding: 1.25rem 1.5rem; margin-inline: auto; max-width: ${this.route === 'app' ? '72rem' : this.route === 'emails' || this.route === 'demo-emails' ? '88rem' : '76rem'}">${this.renderSteps()}${body}</main>
       </calcite-shell>`;
   }

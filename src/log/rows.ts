@@ -100,6 +100,28 @@ export function applyNudgeLog(data: Data, latest: ReadonlyMap<string, string> | 
   return changed ? { ...data, owners } : data;
 }
 
+/** DC-125c: who a merged lastNotified came from. */
+export interface NudgeSource { by: 'you' | 'another-admin'; admin: string }
+export interface MergedLog { latest: LogRead; by: Map<string, NudgeSource> }
+
+/**
+ * ADR 0013, decision 6: the admin's own log plus every other admin's, merged into one owner-to-latest-send map (latest
+ * wins; a tie counts as yours). `by` records the log owner, so the UI can say "by another admin" with no new request.
+ * The admin's own sends (for "Since your nudges") stay as they were. Pure.
+ */
+export function mergeLogReads(mine: LogRead | null | undefined, others: readonly { admin: string; read: ReadonlyMap<string, string> }[], me: string): MergedLog {
+  const latest = new Map<string, string>();
+  const by = new Map<string, NudgeSource>();
+  const take = (owner: string, at: string, src: NudgeSource) => {
+    const prev = latest.get(owner);
+    const better = prev === undefined || Date.parse(at) > Date.parse(prev) || (Date.parse(at) === Date.parse(prev) && src.by === 'you');
+    if (better) { latest.set(owner, at); by.set(owner, src); }
+  };
+  for (const [o, at] of mine ?? []) take(o, at, { by: 'you', admin: me });
+  for (const { admin, read } of others) for (const [o, at] of read) take(o, at, { by: 'another-admin', admin });
+  return { latest: logRead(latest, mine?.sends ?? []), by };
+}
+
 /** Adds one send to a latest-by-owner map (for showing a send at once, before the table is read again). */
 export function withSend(latest: ReadonlyMap<string, string> | null | undefined, owner: string, at: Date): Map<string, string> {
   const m = new Map(latest ?? []);

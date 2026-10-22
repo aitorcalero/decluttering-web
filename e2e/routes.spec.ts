@@ -21,8 +21,13 @@ test('landing page offers sign-in and the demo, and the demo route works', async
 });
 
 test('an OAuth error on return shows the approval message', async ({ page }) => {
-  await page.goto('/?error=access_denied&error_description=nope');
+  await page.goto('/?error=invalid_request&error_description=nope');
   await expect(page.locator('[data-page="error"]')).toContainText('approve');
+});
+
+test('declining on the ArcGIS page shows a calm "no problem", even with a description (DC-125f)', async ({ page }) => {
+  await page.goto('/?error=access_denied&error_description=The%20user%20denied%20your%20request.');
+  await expect(page.locator('[data-page="error"]')).toContainText('No problem, nothing was shared');
 });
 
 test('the app route without a session goes back to the landing page', async ({ page }) => {
@@ -53,9 +58,11 @@ test('demo: review -> write the emails -> test to me -> confirm -> send, with re
   await expect(page.locator('[data-preview="subject"]')).toContainText('of your ArcGIS items could use a quick look');
   await expect(page.locator('[data-preview="body"] a').first()).toHaveAttribute('href', /\.maps\.arcgis\.com\/home\/item\.html\?id=/);
 
-  // Test to me: the consent dialog comes first (the group doesn't exist yet), then the test goes out.
+  // Test to me: "Turn on sending" comes first (the group doesn't exist yet), then the test goes out (ADR 0013).
   await page.locator('[data-action="test"]').click();
-  await page.locator('#em-consent [data-action="consent-yes"]').click();
+  await page.locator('#turn-on-dialog [data-action="turn-on-yes"]').click();
+  await expect(page.locator('[data-toast]')).toContainText('Send yourself a test first');
+  await page.locator('[data-action="test"]').click();
   await expect(page.locator('[data-toast]')).toContainText('Nobody else got it');
 
   // Real send only after the confirm dialog, which states the count.

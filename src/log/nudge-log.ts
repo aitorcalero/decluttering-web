@@ -3,13 +3,12 @@
 // is the log item's own title (DC-075), at create time only, never on a read, plus its thumbnail (ADR 0012). The one
 // delete is the admin's explicit request from About (ADR 0012): the app's own log item, re-checked just before.
 // Every request goes through ./guard. Default deny by org, like the notifier (DC-058).
-import { WRITABLE_ORG_IDS } from '../auth/config';
-import { writeAllowed } from '../auth/write-allowed';
+import { mayOptIn, type SendingMode } from '../auth/sending';
 import { WritesDisabled } from '../notify/notifier';
 import { SEND_THUMBNAILS, createThumbnailLoader, type ParamValue, type ThumbnailLoader } from '../notify/thumbnail';
 import type { Sender } from '../scan/request';
 import {
-  adminUrlOf, assertLogAllowed, isLogServiceUrl, LOG_FIELDS, LOG_NAME_RE, LOG_TABLE_NAME, LOG_TAG, LOG_TITLE, type LogGuardContext,
+  adminUrlOf, assertLogAllowed, assertOtherLogReadAllowed, isLogServiceUrl, LOG_FIELDS, LOG_NAME_RE, LOG_TABLE_NAME, LOG_TAG, LOG_TITLE, type LogGuardContext,
 } from './guard';
 import { buildRow, logRead, readRows, type LogRead, type RowInput } from './rows';
 
@@ -23,6 +22,9 @@ export interface LogTable {
   reused: boolean;
 }
 
+/** DC-125c: what reading the other admins' logs gave. `unreadable`: a log (or the search for them) could not be read. */
+export interface OthersRead { reads: { admin: string; read: LogRead }[]; unreadable: boolean }
+
 export interface NudgeLog {
   readonly table: LogTable | null;
   whoAmI(): Promise<string>;
@@ -32,6 +34,10 @@ export interface NudgeLog {
   create(): Promise<LogTable>;
   /** Adds one row (applyEdits adds). Returns the new object id. */
   record(row: RowInput): Promise<number>;
+  /** DC-125c: every app log in the signed-in org, any owner. Search only (GET); changes nothing, including `table`. */
+  findAllInOrg(): Promise<LogTable[]>;
+  /** DC-125c: reads the other admins' logs, query only (GET), through the read-only guard. Never throws; see OthersRead. */
+  readOthers(): Promise<OthersRead>;
   /** Owner username to their latest logged send (ISO), with the sends themselves (DC-096). Empty when there is no log. GET only. */
   read(): Promise<LogRead>;
   /**
@@ -48,6 +54,8 @@ export interface NudgeLogOptions {
   portal: string;
   orgId: string;
   writableOrgIds?: string | readonly string[];
+  /** Overrides VITE_SENDING (tests only). */
+  sendingMode?: SendingMode;
   self?: string;
   /** Test hook for the service-name suffix. */
   random?: () => string;
@@ -104,8 +112,26 @@ export function isAppLog(it: ItemLike, me: string): boolean {
     && tags.includes(LOG_TAG) && (title === LOG_TITLE || LOG_NAME_RE.test(title)) && isLogServiceUrl(it.url);
 }
 
+/** DC-125c: like isAppLog for a log of any owner (the owner just has to be named). */
+export function isAppLogAnyOwner(it: ItemLike): boolean {
+  return typeof it.owner === 'string' && it.owner.length > 0 && isAppLog(it, it.owner);
+}
+
+/**
+ * DC-125c: a sender for other admins' logs that checks assertOtherLogReadAllowed before any request: a GET query on a
+ * service with the app's log shape, nothing else. No write can go through it.
+ */
+export function guardedOtherSend(send: Sender, portal: string): Sender {
+  return async (url, o) => {
+    assertOtherLogReadAllowed(url, o.method, o.params, portal);
+    return send(url, o);
+  };
+}
+
+const QUERY_FIELDS = 'owner,sent_at,item_ids,item_count,credits,is_test';
+
 export function createNudgeLog(opts: NudgeLogOptions): NudgeLog {
-  if (!writeAllowed(opts.orgId, opts.writableOrgIds ?? WRITABLE_ORG_IDS)) throw new WritesDisabled();
+  if (!mayOptIn(opts.orgId, opts)) throw new WritesDisabled();
   const portal = opts.portal.replace(/\/+$/, '');
   const rest = `${portal}/sharing/rest`;
   const ctx: LogGuardContext = { portal, self: opts.self ?? null, serviceUrl: null, newServiceUrl: null };
@@ -120,6 +146,30 @@ export function createNudgeLog(opts: NudgeLogOptions): NudgeLog {
     const err = res?.error as { code?: unknown; message?: unknown } | undefined;
     if (err) throw Object.assign(new Error(`ArcGIS Online said no: ${String(err.message ?? err.code ?? 'error')}`), { code: err.code });
     return res ?? {};
+  }
+
+  /** An ArcGIS error body becomes a thrown error, as `req` does. */
+  function unwrap(res: unknown): Record<string, unknown> {
+    const r = (res ?? {}) as Record<string, unknown>;
+    const err = r.error as { code?: unknown; message?: unknown } | undefined;
+    if (err) throw Object.assign(new Error(`ArcGIS Online said no: ${String(err.message ?? err.code ?? 'error')}`), { code: err.code });
+    return r;
+  }
+
+  /** The table's rows, a page at a time, through `get` (own log: the full guard; another admin's: the read-only guard). */
+  async function queryAll(serviceUrl: string, get: (url: string, params: Record<string, ParamValue>) => Promise<Record<string, unknown>>): Promise<{ attributes?: Record<string, unknown> }[]> {
+    const features: { attributes?: Record<string, unknown> }[] = [];
+    for (let page = 0, offset = 0; page < 25; page++) {
+      const res = await get(`${serviceUrl}/0/query`, {
+        where: '1=1', outFields: QUERY_FIELDS, returnGeometry: 'false', orderByFields: 'OBJECTID ASC',
+        resultOffset: offset, resultRecordCount: 2000,
+      }) as { features?: { attributes?: Record<string, unknown> }[]; exceededTransferLimit?: unknown };
+      const batch = res.features ?? [];
+      features.push(...batch);
+      if (res.exceededTransferLimit !== true || !batch.length) break;
+      offset += batch.length;
+    }
+    return features;
   }
 
   async function whoAmI(): Promise<string> {
@@ -238,20 +288,35 @@ export function createNudgeLog(opts: NudgeLogOptions): NudgeLog {
       if (r?.success !== true || typeof r.objectId !== 'number') throw new Error('ArcGIS Online did not add the log row');
       return r.objectId;
     },
+    async findAllInOrg() {
+      const orgId = opts.orgId.trim();
+      const out: LogTable[] = [];
+      for (let start = 1, page = 0; start > 0 && page < 20; page++) {
+        const res = await req(`${rest}/search`, {
+          q: `tags:"${LOG_TAG}" AND type:"Feature Service" AND orgid:${orgId}`, num: 100, start, sortField: 'created', sortOrder: 'asc',
+        }, 'GET') as { results?: ItemLike[]; nextStart?: unknown };
+        for (const it of res.results ?? []) if (isAppLogAnyOwner(it)) out.push(asTable(it, true));
+        start = Number(res.nextStart ?? -1);
+      }
+      return out;
+    },
+    async readOthers() {
+      const out: OthersRead = { reads: [], unreadable: false };
+      try {
+        const me = await whoAmI();
+        const readOnly = guardedOtherSend(opts.send, portal);
+        for (const t of (await api.findAllInOrg()).filter((x) => x.owner !== me)) {
+          try {
+            const get = async (u: string, p: Record<string, ParamValue>) => unwrap(await readOnly(u, { method: 'GET', params: { f: 'json', ...p } as Record<string, string | number> }));
+            out.reads.push({ admin: t.owner, read: readRows(await queryAll(t.serviceUrl, get)) });
+          } catch { out.unreadable = true; }
+        }
+      } catch { out.unreadable = true; }
+      return out;
+    },
     async read() {
       if (!table) return logRead();
-      const features: { attributes?: Record<string, unknown> }[] = [];
-      for (let page = 0, offset = 0; page < 25; page++) {
-        const res = await req(`${table.serviceUrl}/0/query`, {
-          where: '1=1', outFields: 'owner,sent_at,item_ids,item_count,credits,is_test', returnGeometry: 'false', orderByFields: 'OBJECTID ASC',
-          resultOffset: offset, resultRecordCount: 2000,
-        }, 'GET') as { features?: { attributes?: Record<string, unknown> }[]; exceededTransferLimit?: unknown };
-        const batch = res.features ?? [];
-        features.push(...batch);
-        if (res.exceededTransferLimit !== true || !batch.length) break;
-        offset += batch.length;
-      }
-      return readRows(features);
+      return readRows(await queryAll(table.serviceUrl, (u, p) => req(u, p, 'GET')));
     },
     async deleteLog() {
       if (!table) throw new Error('The nudge log is not set up yet');

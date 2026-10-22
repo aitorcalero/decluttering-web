@@ -1,37 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { ALLOW_OWNER_SENDS, gateNotifier, nextSendStep, OWNER_SENDS_OFF, parseAllowFlag, sendGate, type GateInput, type SendStep } from './gate';
+import { gateNotifier, NOT_OPTED_IN, nextSendStep, OWNER_SENDS_OFF, SENDING_UNAVAILABLE, TEST_FIRST, sendGate, type GateInput, type SendStep } from './gate';
+import { DAY_FULL } from './limits';
 import { createDemoNotifier } from './demo-notifier';
-import { createGroupNotifier, CREATE_GROUP_PRIVILEGE, WritesDisabled, READ_ONLY_NOTE } from '../../notify';
+import { createGroupNotifier, CREATE_GROUP_PRIVILEGE, WritesDisabled } from '../../notify';
 import type { RequestFn } from '../../scan/types';
 
-const base: GateInput = { demo: false, allowOwnerSends: true, writable: true, canCreate: true, owners: 3 };
-
-describe('the build switch', () => {
-  it('is off unless exactly "true"', () => {
-    expect(parseAllowFlag(undefined)).toBe(false);
-    expect(parseAllowFlag('')).toBe(false);
-    expect(parseAllowFlag('1')).toBe(false);
-    expect(parseAllowFlag('TRUE')).toBe(false);
-    expect(parseAllowFlag('true')).toBe(true);
-  });
-  it('is off in the test build', () => {
-    expect(ALLOW_OWNER_SENDS).toBe(false);
-  });
-});
+/** An org that may opt in, an admin who has, and owner sends unlocked (the unlock itself is DC-125b's). */
+const base: GateInput = { demo: false, ownerSendsUnlocked: true, mayOptIn: true, optedIn: true, canCreate: true, owners: 3 };
 
 describe('send gate', () => {
-  it('allows both with the switch on, a writable org and the privilege', () => {
+  it('allows both with an org that may opt in, an opted-in admin, the privilege and the unlock', () => {
     expect(sendGate(base)).toEqual({ test: { ok: true }, owners: { ok: true } });
   });
-  it('blocks owner sends when VITE_ALLOW_OWNER_SENDS is off, but not the test', () => {
-    const g = sendGate({ ...base, allowOwnerSends: false });
+  it('owner sends stay locked until unlocked, but the test is allowed', () => {
+    const g = sendGate({ ...base, ownerSendsUnlocked: false });
     expect(g.test.ok).toBe(true);
-    expect(g.owners).toEqual({ ok: false, reason: 'owner-sends-off', message: OWNER_SENDS_OFF });
+    expect(g.owners).toEqual({ ok: false, reason: 'test-first', message: TEST_FIRST });
   });
-  it('blocks both when the org is not writable', () => {
-    const g = sendGate({ ...base, writable: false });
-    expect(g.test).toMatchObject({ ok: false, reason: 'read-only', message: READ_ONLY_NOTE });
+  it('blocks both when no org may opt in (off, or an unlisted org), with the calm line', () => {
+    const g = sendGate({ ...base, mayOptIn: false });
+    expect(g.test).toMatchObject({ ok: false, reason: 'read-only', message: SENDING_UNAVAILABLE });
     expect(g.owners.ok).toBe(false);
+    expect(SENDING_UNAVAILABLE).toBe('Sending isn’t available on this site yet. You can still review everything and write the emails.');
+  });
+  it('an org that may opt in, not yet opted in: no test, no owner sends, and it says to turn sending on', () => {
+    const g = sendGate({ ...base, optedIn: false });
+    expect(g.test).toEqual({ ok: false, reason: 'not-opted-in', message: NOT_OPTED_IN });
+    expect(g.owners.ok).toBe(false);
+    expect(g.owners.reason).toBe('not-opted-in');
+  });
+  it('opted in allows the test send', () => {
+    expect(sendGate({ ...base, optedIn: true, ownerSendsUnlocked: false }).test).toEqual({ ok: true });
+  });
+  it('owner sends are locked in every state while the lock is false', () => {
+    for (const mayOptIn of [true, false]) for (const optedIn of [true, false]) for (const canCreate of [true, false, null]) {
+      expect(sendGate({ ...base, mayOptIn, optedIn, canCreate, ownerSendsUnlocked: false }).owners.ok).toBe(false);
+    }
+  });
+  it('a non-boolean-true lock stays locked (fail closed)', () => {
+    expect(sendGate({ ...base, ownerSendsUnlocked: 'true' as never }).owners.ok).toBe(false);
+    expect(sendGate({ ...base, ownerSendsUnlocked: undefined as never }).owners.ok).toBe(false);
   });
   it('blocks both without the privilege, and while it is being checked', () => {
     expect(sendGate({ ...base, canCreate: false }).owners.reason).toBe('no-privilege');
@@ -41,8 +49,27 @@ describe('send gate', () => {
     expect(sendGate({ ...base, owners: 0 }).test.reason).toBe('nobody');
     expect(sendGate({ ...base, owners: 0 }).owners.ok).toBe(false);
   });
-  it('the demo (in-memory fake) may show owner sends with the switch off', () => {
-    expect(sendGate({ ...base, demo: true, allowOwnerSends: false, writable: false }).owners.ok).toBe(true);
+  it('the demo (in-memory fake) shows as opted in and may show owner sends while locked', () => {
+    expect(sendGate({ ...base, demo: true, ownerSendsUnlocked: false, mayOptIn: false, optedIn: false }).owners.ok).toBe(true);
+  });
+});
+
+describe('send gate: the daily limit (DC-125d)', () => {
+  it('allows owner sends under the limit and blocks them at it, with the reason', () => {
+    expect(sendGate({ ...base, sentToday: 99 }).owners).toEqual({ ok: true });
+    expect(sendGate({ ...base, sentToday: 100 }).owners).toEqual({ ok: false, reason: 'daily-limit', message: DAY_FULL });
+    expect(sendGate({ ...base, sentToday: 250 }).owners.reason).toBe('daily-limit');
+  });
+  it('never blocks the test to yourself, and the demo shows the same limit', () => {
+    expect(sendGate({ ...base, sentToday: 100 }).test).toEqual({ ok: true });
+    expect(sendGate({ ...base, demo: true, sentToday: 100 }).owners.reason).toBe('daily-limit');
+  });
+  it('an unknown count (not given) blocks nothing; a junk count blocks', () => {
+    expect(sendGate(base).owners.ok).toBe(true);
+    expect(sendGate({ ...base, sentToday: Number.NaN }).owners.reason).toBe('daily-limit');
+  });
+  it('test-first still comes first', () => {
+    expect(sendGate({ ...base, ownerSendsUnlocked: false, sentToday: 100 }).owners.reason).toBe('test-first');
   });
 });
 
@@ -60,21 +87,21 @@ describe('send gate: the admin email (DC-121)', () => {
     expect(sendGate(base).test.ok).toBe(true);
   });
   it('the demo admin has an email, so the demo is unaffected', () => {
-    const g = sendGate({ ...base, demo: true, allowOwnerSends: false, writable: false, adminEmail: 'you@example.org' });
+    const g = sendGate({ ...base, demo: true, ownerSendsUnlocked: false, mayOptIn: false, optedIn: false, adminEmail: 'you@example.org' });
     expect(g.test.ok).toBe(true);
     expect(g.owners.ok).toBe(true);
   });
   it('owner sends stay behind their own switches, not the admin email', () => {
     expect(sendGate({ ...base, adminEmail: '' }).owners.ok).toBe(true);
-    expect(sendGate({ ...base, adminEmail: '', allowOwnerSends: false }).owners.reason).toBe('owner-sends-off');
+    expect(sendGate({ ...base, adminEmail: '', ownerSendsUnlocked: false }).owners.reason).toBe('test-first');
   });
   it('a read-only org still says read-only first', () => {
-    expect(sendGate({ ...base, writable: false, adminEmail: '' }).test.reason).toBe('read-only');
+    expect(sendGate({ ...base, mayOptIn: false, adminEmail: '' }).test.reason).toBe('read-only');
   });
 });
 
 describe('confirm gating', () => {
-  const open = sendGate(base), shut = sendGate({ ...base, allowOwnerSends: false });
+  const open = sendGate(base), shut = sendGate({ ...base, ownerSendsUnlocked: false });
   const walk = (events: Parameters<typeof nextSendStep>[1][], gate = open) => events.reduce<SendStep>((s, e) => nextSendStep(s, e, gate), 'compose');
   it('sending starts only after ask and confirm', () => {
     expect(walk([{ type: 'confirm' }])).toBe('compose');
@@ -136,6 +163,22 @@ describe('the gated notifier', () => {
     const d = createDemoNotifier({ self: 'me_admin', canCreateGroup: false });
     expect((await d.notifier.canCreateGroup()).ok).toBe(false);
     expect(CREATE_GROUP_PRIVILEGE).toBe('portal:user:createGroup');
+  });
+});
+
+describe('the lock is read at every call (the DC-125b seam)', () => {
+  it('a function lock opens and closes live; a non-true value stays locked', async () => {
+    const d = createDemoNotifier({ self: 'me_admin' });
+    let open = false;
+    const n = gateNotifier(d.notifier, () => open);
+    await n.createGroup();
+    await expect(n.sendToOwner('owner_1', 's', '<p>h</p>')).rejects.toThrow(OWNER_SENDS_OFF);
+    open = true;
+    expect(await n.sendToOwner('owner_1', 's', '<p>h</p>')).toMatchObject({ sent: true });
+    open = false;
+    await expect(n.add(['owner_1'])).rejects.toThrow(OWNER_SENDS_OFF);
+    const loose = gateNotifier(d.notifier, (() => 'yes') as never);
+    await expect(loose.add(['owner_1'])).rejects.toThrow(OWNER_SENDS_OFF);
   });
 });
 

@@ -1,9 +1,10 @@
 import { createRequest } from '../scan/request';
 import { ArcGISIdentityManager } from '@esri/arcgis-rest-request';
 import { accessMode, type AccessMode } from './access';
-import { CLIENT_ID, PORTAL_URL, WRITABLE_ORG_IDS, redirectUri } from './config';
-import { writeAllowed } from './write-allowed';
+import { CLIENT_ID, PORTAL_URL, redirectUri } from './config';
+import { buildMayOptIn } from './sending';
 import { oauthErrorMessage, parseOAuthError } from './oauth-error';
+import { clearUnlocks } from '../ui/emails/unlock';
 
 const SESSION_KEY = 'decluttering:session';
 const SETTINGS_PREFIX = 'decluttering:';
@@ -17,7 +18,7 @@ export interface AccessInfo {
   orgId: string;
   role: string;
   usageReadable: boolean;
-  /** True only when this org is in VITE_WRITABLE_ORG_IDS (DC-058). False means nothing may be sent or created. */
+  /** ADR 0013: true only when this build lets an admin in this org turn sending on (VITE_SENDING). False means nothing may be sent or created. */
   writable: boolean;
   /** The org's URL key and custom base URL host (portals/self), for links to items and people in the admin's own org. */
   urlKey?: string;
@@ -99,7 +100,7 @@ export async function handleRedirect(): Promise<ReturnResult> {
   const err = parseOAuthError(search);
   const clean = `${window.location.pathname}${window.location.hash}`;
   try {
-    if (err) throw new Error(err.description || err.error);
+    if (err) throw Object.assign(new Error(err.description || err.error), { code: err.error });
     const manager = await ArcGISIdentityManager.completeOAuth2(oauthOptions());
     saveSession(manager);
     return { kind: 'signed-in', manager };
@@ -135,7 +136,7 @@ export async function loadAccess(manager: ArcGISIdentityManager): Promise<Access
     orgId: self.id ?? '',
     role: u.role ?? '',
     usageReadable,
-    writable: writeAllowed(self.id ?? '', WRITABLE_ORG_IDS),
+    writable: buildMayOptIn(self.id ?? ''),
     ...(self.urlKey ? { urlKey: self.urlKey } : {}),
     ...(self.customBaseUrl ? { customBaseUrl: self.customBaseUrl } : {}),
     ...(u.thumbnail ? { thumbnail: u.thumbnail } : {}),
@@ -186,6 +187,7 @@ export async function fetchUserThumbnail(
  */
 export async function signOut(opts: { clearData: boolean }, manager?: Pick<ArcGISIdentityManager, 'signOut'> | null): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY);
+  clearUnlocks(); // DC-125b: the test-first unlock ends with the session, whatever the data choice
   if (typeof manager?.signOut === 'function') {
     try { void manager.signOut().catch(() => { /* already expired or offline: the local session is gone anyway */ }); } catch { /* same */ }
   }

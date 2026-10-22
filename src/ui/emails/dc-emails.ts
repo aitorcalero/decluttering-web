@@ -3,7 +3,7 @@
 // resume and retry. Who may send what is decided in ./gate; digests are built in ./digest; the run is ./send-queue.
 // Light DOM, so the global Calcite and token styles apply (src/styles/emails.css).
 import { noEmailLine, selectAll, selectionOf, selectNone, splitByEmail } from './select';
-import { testToast } from './toast-copy';
+import { sendErrorText, testToast } from './toast-copy';
 import { LitElement, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
@@ -26,13 +26,17 @@ import '@esri/calcite-components/dist/components/calcite-segmented-control';
 import '@esri/calcite-components/dist/components/calcite-segmented-control-item';
 import '../../styles/emails.css';
 import { GROUP_TITLE, type GroupNotifier } from '../../notify';
-import { getLogChoice, getNudgeLog, LOG_TITLE, setLogChoice, setNudgeLog, withSend, type LogChoice, type NudgeLog } from '../../log';
+import { getLogChoice, getNudgeLog, getNudgeSends, getOthersUnreadable, LOG_TITLE, setLogChoice, setNudgeLog, withSend, type LogChoice, type NudgeLog } from '../../log';
+import { othersUnreadableLine, renudgeLine } from '../../domain/cooldown';
 import { agoText, credit, plural } from '../shared/text';
 import {
   buildDigest, chipsToTokens, emailHtml, esc, fillSubject, firstName, outsideLinks, PH_LABEL, PLACEHOLDERS, TONES, tokensToChips, totalCredits,
   usedPlaceholders, type Admin, type EmailOrg, type EmailOwner, type PlaceholderKey, type ToneKey,
 } from './digest';
-import { nextSendStep, sendGate, type Gate, type SendStep } from './gate';
+import { nextSendStep, sendGate, SENDING_UNAVAILABLE, TEST_EACH_SESSION, type Gate, type SendStep } from './gate';
+import './dc-turn-on-sending';
+import { TURN_ON_NEXT } from './turn-on-copy';
+import { effectiveLimits, forgetPageSends, planSend, recordPageSend, sentTodayFor, type SendPlan } from './limits';
 import { createSendQueue, tidyLine, tidyWarning, type QueueItem, type QueueSnapshot, type SendQueue } from './send-queue';
 
 const INTRO_KEY = 'dc-email-intro-hidden';
@@ -45,7 +49,7 @@ const draft: { tone: ToneKey; subject: string; tpl: string; dirty: boolean } = {
 
 type SetupState = 'work' | 'done' | 'reuse';
 interface Toast { title: string; message: string; kind: 'success' | 'danger' }
-type Dialog = 'intro' | 'consent' | 'confirm' | 'tone' | 'link' | null;
+type Dialog = 'intro' | 'turn-on' | 'confirm' | 'tone' | 'link' | null;
 
 const PHASE_LABEL: Record<QueueItem['phase'], string> = {
   waiting: 'Waiting its turn', sending: 'Adding, sending, removing from the group…', done: 'Sent and removed from the group',
@@ -61,8 +65,10 @@ export class DcEmails extends LitElement {
   /** null: this org is read-only in this build (DC-058), so nothing can be sent. */
   @property({ attribute: false }) notifier: GroupNotifier | null = null;
   @property({ type: Boolean }) demo = false;
+  /** This org may opt in to sending (VITE_SENDING, ADR 0013). Not the same as "this admin has": see `optedIn`. */
   @property({ type: Boolean }) writable = false;
-  @property({ type: Boolean }) allowOwnerSends = false;
+  /** DC-125b: owner sends are unlocked for this session. The host sets it after `dc-emails-test-sent`; only the host's word counts. */
+  @property({ type: Boolean }) ownerSendsUnlocked = false;
   /** DC-017: the nudge log (null: no log possible here, e.g. a read-only org). */
   @property({ attribute: false }) nudgeLog: NudgeLog | null = null;
   /** The org the review data is from: the remembered log choice and the in-memory log are per org. */
@@ -99,6 +105,8 @@ export class DcEmails extends LitElement {
   private logOn = false;
   private pendingTone: ToneKey | null = null;
   private queue: SendQueue | null = null;
+  /** DC-125d: this run's sends that now have a log row, so reading the log back can stop counting them twice. */
+  private runPageSends: Date[] = [];
   private savedRange: Range | null = null;
   private returnFocus: HTMLElement | null = null;
   private checkedFor: GroupNotifier | null | undefined = undefined;
@@ -114,14 +122,23 @@ export class DcEmails extends LitElement {
   private get noEmail(): Set<string> { return new Set(splitByEmail(this.owners).noEmail.map((o) => o.username)); }
   private get sendable(): EmailOwner[] { const no = this.noEmail; return this.owners.filter((o) => o.rows.length > 0 && !no.has(o.username)); }
   private get picked(): EmailOwner[] { return this.sendable.filter((o) => this.ticked.has(o.username)); }
+  /** DC-125d: this admin's owner emails today (own log rows dated today, plus sends made here that the log hasn't re-read). */
+  private get sentToday(): number { return sentTodayFor(this.orgId, this.admin.username, getNudgeSends(this.orgId)); }
+  private get limits() { return effectiveLimits(this.demo); }
+  /** DC-125d: how many of the ticked owners go in this run (the per-run and per-day limits). */
+  private get plan(): SendPlan { return planSend(this.picked.length, this.sentToday, this.limits); }
+  /** The first `plan.go` ticked owners, in the current order; the rest stay ticked for the next run. */
+  private get toSend(): EmailOwner[] { return this.picked.slice(0, this.plan.go); }
   private get previewOwner(): EmailOwner | undefined {
     return this.sendable.find((o) => o.username === this.sel) ?? this.picked[0] ?? this.sendable[0];
   }
   private get gate(): Gate {
     return sendGate({
-      demo: this.demo, allowOwnerSends: this.allowOwnerSends, writable: this.writable && !!this.notifier,
+      demo: this.demo, ownerSendsUnlocked: this.ownerSendsUnlocked, mayOptIn: this.writable && !!this.notifier,
+      // Opted in = this admin's own app group exists (ADR 0013). Known once the role check has run (canCreate stays null until then).
+      optedIn: !!this.notifier?.group,
       canCreate: this.notifier ? this.canCreate : false, missing: this.missing, owners: this.picked.length,
-      adminEmail: this.admin.email,
+      adminEmail: this.admin.email, sentToday: this.sentToday, perDay: this.limits.perDay,
     });
   }
 
@@ -272,23 +289,54 @@ export class DcEmails extends LitElement {
   /* ------------------------------------------------------------ test to me */
   private onTest = (e: Event): void => {
     if (!this.gate.test.ok || this.testBusy || !this.notifier) return;
-    // ADR 0005 tier 2: creating the group needs the admin's OK first; an existing group is simply reused.
-    if (!this.notifier.group) { this.openDialog('consent', e.currentTarget); return; }
+    // Only the demo's in-memory fake can get here without the group: a real admin must turn sending on first (below).
+    if (!this.notifier.group) { this.openDialog('turn-on', e.currentTarget); return; }
     void this.sendTest();
   };
+
+  /* ------------------------------------------------------------ turn on sending (ADR 0013) */
+  /** The opt-in is the admin's own hidden group. Opens the warm confirm; nothing is created until they say yes. */
+  private onTurnOn = (e: Event): void => {
+    if (!this.canTurnOn()) return;
+    this.openDialog('turn-on', e.currentTarget);
+  };
+  /** A real org: only while the gate says "not opted in" (the org may opt in, the role can create groups). The demo's fake: any time. */
+  private canTurnOn(): boolean {
+    const n = this.notifier;
+    if (!n || n.group || this.testBusy) return false;
+    return this.demo || this.gate.test.reason === 'not-opted-in';
+  }
+  private async turnOn(): Promise<void> {
+    if (!this.canTurnOn()) return;
+    this.testBusy = true;
+    try {
+      await this.ensureGroup();
+      this.requestUpdate();
+      this.showToast('Sending is on for you', TURN_ON_NEXT);
+    } catch (err) {
+      this.showToast('We couldn’t turn sending on', sendErrorText(err), 'danger');
+    } finally {
+      this.testBusy = false;
+    }
+  }
   private async sendTest(): Promise<void> {
     const n = this.notifier, o = this.previewOwner;
     if (!n || !o || this.testBusy || !this.gate.test.ok) return;
     this.testBusy = true;
     try {
+      // The test never creates the group for a real admin: turning sending on is its own, deliberate step (ADR 0013).
+      if (!n.group && !this.demo) throw new Error('Turn on sending first.');
       await this.ensureGroup();
       const d = buildDigest(o, this.template, this.ctx, { test: true });
       await n.sendTest(d.subject, d.html); // to the signed-in admin only; there is no way to name anyone else
       this.testSentAt = Date.now();
-      const t = testToast(this.admin.email, firstName(o.fullName));
+      // ArcGIS accepted it (a failure threw above and never gets here): tell the host, which unlocks owner sends for this session.
+      const first = !this.demo && !this.ownerSendsUnlocked;
+      this.dispatchEvent(new CustomEvent('dc-emails-test-sent', { bubbles: true, composed: true }));
+      const t = testToast(this.admin.email, firstName(o.fullName), { unlocked: first });
       this.showToast(t.title, t.message);
     } catch (err) {
-      this.showToast('The test didn’t go through', err instanceof Error ? err.message : String(err), 'danger');
+      this.showToast('The test didn’t go through', sendErrorText(err), 'danger');
     } finally {
       this.testBusy = false;
     }
@@ -333,24 +381,35 @@ export class DcEmails extends LitElement {
   private async startRun(): Promise<void> {
     const n = this.notifier;
     if (!n) { this.step = 'compose'; return; }
-    const entries = this.picked.map((o) => {
+    const entries = this.toSend.map((o) => {
       const d = buildDigest(o, this.template, this.ctx);
       return { username: o.username, fullName: o.fullName, subject: d.subject, html: d.html };
     });
+    if (!entries.length) { this.step = 'compose'; return; }
     const total = entries.length;
+    this.runPageSends = [];
     const q = createSendQueue(entries, async (u, s, h) => {
       const r = await n.sendToOwner(u, s, h);
-      if (r.sent && !r.notAdded && this.logOn) await this.logSend(u);
+      if (r.sent && !r.notAdded) {
+        // Counted for today's limit at once, whether or not a log row is written.
+        const at = new Date();
+        recordPageSend(this.orgId, this.admin.username, at);
+        if (this.logOn && await this.logSend(u)) this.runPageSends.push(at);
+      }
       return r;
     }, (ev) => {
       this.snap = q.snapshot();
+      if (ev.type === 'state' && this.snap.halted) {
+        const left = this.snap.items.filter((x) => x.phase === 'waiting').length;
+        this.live = `ArcGIS Online stopped this run: ${this.snap.halted.message}. ${this.snap.sent} sent, ${left} still to go.`;
+      }
       if (ev.type !== 'phase') return;
       const i = this.snap.items.findIndex((x) => x.username === ev.item.username) + 1;
       const who = ev.item.fullName;
       if (ev.item.phase === 'sending') this.live = `Sending to ${who}, ${i} of ${total}.`;
       else if (ev.item.phase === 'done') this.live = `Sent to ${who}. ${this.snap.sent} of ${total} sent.`;
       else if (ev.item.phase === 'failed' || ev.item.phase === 'not-added') this.live = `${who}: didn’t go through. ${ev.item.error}`;
-    });
+    }, { gapMs: this.limits.gapMs });
     this.queue = q;
     this.snap = q.snapshot();
     this.toast = null;
@@ -364,7 +423,7 @@ export class DcEmails extends LitElement {
       await this.ensureGroup();
       if (this.logOn) await this.ensureLog();
     } catch (err) {
-      this.showToast('Setup didn’t finish', err instanceof Error ? err.message : String(err), 'danger');
+      this.showToast('Setup didn’t finish', sendErrorText(err), 'danger');
       this.queue = null; this.snap = null; this.step = 'compose';
       return;
     }
@@ -387,23 +446,30 @@ export class DcEmails extends LitElement {
     }
   }
   /** DC-017: one row per owner actually sent to. A failed row never undoes or fails the send; it warns. */
-  private async logSend(username: string): Promise<void> {
+  private async logSend(username: string): Promise<boolean> {
     const l = this.nudgeLog, o = this.owners.find((x) => x.username === username);
-    if (!l || !o) return;
+    if (!l || !o) return false;
     const at = new Date();
     try {
       await l.record({ owner: username, sentAt: at, itemIds: o.rows.map((r) => r.id), credits: totalCredits(o.rows), sender: this.admin.username });
       this.logged += 1;
       setNudgeLog(this.orgId, withSend(getNudgeLog(this.orgId), username, at));
+      return true;
     } catch (e) {
       this.logWarn = `The email went, but the nudge log didn't take a note of it (${e instanceof Error ? e.message : String(e)}). Next time we may not flag who you nudged.`;
+      return false;
     }
   }
   /** DC-017: after a logged run, read the table back so the review shows what it really holds. */
   private async readBack(): Promise<void> {
     const l = this.nudgeLog;
     if (!l?.table || !this.logged) return;
-    try { setNudgeLog(this.orgId, await l.read()); } catch { /* the rows just added are already shown */ }
+    try {
+      setNudgeLog(this.orgId, await l.read());
+      // The log holds this run's logged sends now, so they are counted from it, not twice.
+      forgetPageSends(this.orgId, this.admin.username, this.runPageSends);
+      this.runPageSends = [];
+    } catch { /* the rows just added are already shown, and still counted for today */ }
   }
 
   /** DC-068 (ADR 0002): each owner-send run starts by taking leftovers out of the app's group. A failure warns, never blocks. */
@@ -425,6 +491,9 @@ export class DcEmails extends LitElement {
     this.step = nextSendStep(this.step, { type: 'finished' }, this.gate);
     this.snap = this.queue?.snapshot() ?? null;
     const sent = this.snap?.sent ?? 0;
+    // Owners just emailed come off the ticked list, so the next run's first owners are the ones still to go.
+    const done = new Set(this.snap?.items.filter((i) => i.phase === 'done').map((i) => i.username) ?? []);
+    if (done.size) this.ticked = new Set([...this.ticked].filter((u) => !done.has(u)));
     void this.readBack();
     this.live = sent ? `All done. ${plural(sent, 'owner has', 'owners have')} their email.` : 'Nothing was sent.';
     requestAnimationFrame(() => this.querySelector<HTMLElement & { setFocus?: () => void }>('#done-back')?.setFocus?.());
@@ -441,6 +510,16 @@ export class DcEmails extends LitElement {
     await q.retry(u);
     this.afterRun();
   };
+  /** DC-125d: after ArcGIS refused a send, the admin chooses to carry on from the next owner... */
+  private resumeAfterStop = async (): Promise<void> => {
+    const q = this.queue;
+    if (!q || q.snapshot().running) return;
+    this.live = 'Carrying on from the next owner.';
+    await q.resume();
+    this.afterRun();
+  };
+  /** ...or to stop here: nobody else is sent to. */
+  private stopHere = (): void => { this.queue?.skipWaiting(); this.finish(); };
   private giveUp = (): void => { this.queue?.giveUpFailed(); this.finish(); };
 
   /* one at a time */
@@ -573,19 +652,26 @@ export class DcEmails extends LitElement {
   }
 
   private renderBar() {
-    const g = this.gate, n = this.picked;
+    const g = this.gate, n = this.picked, plan = this.plan;
     const items = n.reduce((s, o) => s + o.rows.length, 0);
-    const realLabel = this.mode === 'one' ? `Go through ${plural(n.length, 'owner', 'owners')} one by one` : `Send to ${plural(n.length, 'owner', 'owners')}`;
-    const blockNote = g.test.reason === 'read-only' ? 'Sending is off for this organisation in this build. You can still write and preview every email.'
+    // DC-125d: the button says how many go now (the limits can be fewer than the ticked count).
+    const goN = n.length ? plan.go : 0;
+    const realLabel = this.mode === 'one' ? `Go through ${plural(goN, 'owner', 'owners')} one by one` : `Send to ${plural(goN, 'owner', 'owners')}`;
+    const blockNote = g.test.reason === 'read-only' ? SENDING_UNAVAILABLE
+      : g.test.reason === 'not-opted-in' ? 'Sending is off for you. Turn it on when you’re ready; nothing is sent until you choose. You can still write and preview every email.'
       : g.test.reason === 'no-privilege' ? `${g.test.message} Ask an administrator to add it to your role. You can still write and preview every email here.`
       : g.test.reason === 'no-email' ? g.test.message ?? null
       : null;
+    // DC-125b: opted in, test possible, owner sends still locked: the test is the next step, so it gets the highlight.
+    const testNext = g.test.ok && g.owners.reason === 'test-first';
     return html`<div class="em-bar" data-bar="emails">
       <div class="em-setup-list">${this.setupRow()}</div>
       ${blockNote ? html`<div class="em-setup em-warn" role="note" data-note=${g.test.reason!}><calcite-icon icon="lock" scale="s" aria-hidden="true"></calcite-icon><span>${blockNote}</span></div>` : nothing}
+      ${n.length && plan.notes.length ? html`<div class="em-setup" role="note" data-note="send-limit"><calcite-icon icon="information" scale="s" aria-hidden="true"></calcite-icon><span>${plan.notes.join(' ')}</span></div>` : nothing}
       <div class="em-bar-row">
         <div class="em-bar-sum"><b data-bar-main>${n.length ? `${plural(n.length, 'owner', 'owners')} · ${plural(items, 'item', 'items')}` : 'No one ticked yet'}</b>
           <span>${this.testSentAt ? 'Your test has been sent. Check your inbox.' : 'Send yourself a test first. It only goes to you.'}</span>
+          ${testNext && !this.testSentAt ? html`<span class="em-bar-note" data-note="test-each-session"><calcite-icon icon="information" scale="s" aria-hidden="true"></calcite-icon>${TEST_EACH_SESSION}</span>` : nothing}
           ${this.demo ? html`<span class="em-bar-note"><calcite-icon icon="information" scale="s" aria-hidden="true"></calcite-icon>Demo: nothing is really sent.</span>`
             : html`<span class="em-bar-note"><calcite-icon icon="lock" scale="s" aria-hidden="true"></calcite-icon>Sent from your own ArcGIS Online org, from this browser. Nothing goes through us.</span>`}</div>
         <div class="em-bar-act">
@@ -593,11 +679,14 @@ export class DcEmails extends LitElement {
             <calcite-segmented-control-item value="all" ?checked=${this.mode === 'all'}>All at once</calcite-segmented-control-item>
             <calcite-segmented-control-item value="one" ?checked=${this.mode === 'one'}>One at a time</calcite-segmented-control-item>
           </calcite-segmented-control>
-          <calcite-button data-action="test" appearance="outline" kind="brand" icon-start="email-address" ?disabled=${!g.test.ok || !this.previewOwner} ?loading=${this.testBusy}
-            @click=${this.onTest}>Send a test to me</calcite-button>
+          ${g.test.reason === 'not-opted-in'
+            ? html`<calcite-button data-action="turn-on" appearance="outline" kind="brand" icon-start="group" ?disabled=${this.testBusy} ?loading=${this.testBusy}
+                @click=${this.onTurnOn}>Turn on sending</calcite-button>`
+            : html`<calcite-button data-action="test" appearance=${testNext ? 'solid' : 'outline'} data-next=${testNext ? 'true' : nothing} kind="brand" icon-start="email-address" ?disabled=${!g.test.ok || !this.previewOwner} ?loading=${this.testBusy}
+                @click=${this.onTest}>Send a test to me</calcite-button>`}
           <span class="em-real-wrap">
             <calcite-button data-action="send" icon-start="envelope" ?disabled=${!g.owners.ok} title=${g.owners.ok ? '' : g.owners.message ?? ''} aria-description=${g.owners.ok ? nothing : g.owners.message ?? nothing} @click=${this.onReal}>${realLabel}</calcite-button>
-            ${g.owners.reason === 'owner-sends-off' ? html`<small class="em-off" data-note="owner-sends-off">${g.owners.message}</small>` : nothing}
+            ${g.owners.reason === 'test-first' ? html`<small class="em-off" data-note="test-first">${g.owners.message}</small>` : nothing}
           </span>
         </div>
       </div>
@@ -642,24 +731,44 @@ export class DcEmails extends LitElement {
     if (this.mode === 'one') return this.renderOne(s);
     const n = s.items.length;
     const settingUp = this.setup === 'work';
-    const heading = settingUp ? 'Getting things ready' : s.finished ? 'Nearly there' : s.paused ? 'Paused' : 'Sending the digests';
+    const waiting = s.items.filter((i) => i.phase === 'waiting');
+    // DC-125d: a refusal from ArcGIS stops the run while owners are still waiting; nobody else is sent to until the admin says.
+    const stopped = !!s.halted && waiting.length > 0 && !s.running;
+    const heading = settingUp ? 'Getting things ready' : stopped ? 'Stopped' : s.finished ? 'Nearly there' : s.paused ? 'Paused' : 'Sending the digests';
     const sub = settingUp ? 'Setting up in your own org. Nothing has been sent yet.'
       : s.finished ? `${s.sent} sent, ${s.failed} didn't go through. Have another go at the ones that stalled.`
+      : stopped ? 'ArcGIS Online refused an email, so nothing further goes out until you choose.'
       : s.paused ? (s.running ? 'Finishing this owner, then nothing further goes out until you resume.' : 'Nothing further goes out until you resume.')
       : 'One owner at a time: add, send, remove, so the group stays empty.';
-    return html`<div class="run" data-run-state=${s.finished ? 'finished' : s.paused ? 'paused' : 'running'}>
+    return html`<div class="run" data-run-state=${stopped ? 'stopped' : s.finished ? 'finished' : s.paused ? 'paused' : 'running'}>
       <div class="run-head"><div><h1>${heading}</h1><p class="lede">${sub}</p></div>
         <div class="run-act">${s.finished
           ? html`<calcite-button data-action="finish" appearance="outline" kind="neutral" @click=${this.giveUp}>Finish without the rest</calcite-button>`
+          : stopped ? nothing
           : html`<calcite-button data-action="pause" appearance="outline" kind="neutral" icon-start=${s.paused ? 'play' : 'pause'} ?disabled=${settingUp}
               @click=${this.togglePause}>${s.paused ? 'Resume' : 'Pause'}</calcite-button>`}</div></div>
       <div class="em-setup-list">${this.setupRow()}</div>
+      ${stopped ? this.renderStopped(s, waiting) : nothing}
       <calcite-progress type="determinate" value=${n ? s.sent / n : 0} label="Send progress"></calcite-progress>
       <p class="muted small" data-run-count>${s.sent} of ${n} sent</p>
       <ul class="run-list" aria-label="Owners">${s.items.map((it) => this.runRow(it))}</ul>
       ${this.demo ? html`<p class="em-note"><calcite-icon icon="information" scale="s" aria-hidden="true"></calcite-icon>Demo: nothing is really sent.</p>`
         : html`<p class="em-note"><calcite-icon icon="lock" scale="s" aria-hidden="true"></calcite-icon>Sent from your own ArcGIS Online org, from this browser. Nothing goes through us.</p>`}
     </div>`;
+  }
+
+  /** DC-125d: what ArcGIS said, how many went, who is left, and the two ways on. */
+  private renderStopped(s: QueueSnapshot, waiting: QueueItem[]) {
+    const names = waiting.slice(0, 5).map((i) => i.fullName).join(', ') + (waiting.length > 5 ? ` and ${waiting.length - 5} more` : '');
+    const h = s.halted!, who = s.items.find((i) => i.username === h.username)?.fullName ?? h.username;
+    return html`<div class="em-setup em-warn" role="alert" data-halted>
+      <calcite-icon icon="exclamation-mark-triangle" scale="s" aria-hidden="true"></calcite-icon>
+      <span><b>ArcGIS Online refused the email to ${who}.</b> It said: “<span data-halted-message>${h.message}</span>”. ${plural(s.sent, 'owner has', 'owners have')} their email so far.
+        Still to go (${waiting.length}): <span data-halted-left>${names}</span>. Resume carries on from the next owner; ${who} can be tried again from the list.</span>
+      <span class="run-act">
+        <calcite-button scale="s" data-action="resume-halt" icon-start="play" @click=${() => void this.resumeAfterStop()}>Resume</calcite-button>
+        <calcite-button scale="s" data-action="stop-here" appearance="outline" kind="neutral" @click=${this.stopHere}>Stop here</calcite-button>
+      </span></div>`;
   }
 
   private renderOne(s: QueueSnapshot) {
@@ -750,11 +859,15 @@ export class DcEmails extends LitElement {
   }
 
   private renderDialogs() {
-    const n = this.picked, items = n.reduce((s, o) => s + o.rows.length, 0), cr = n.reduce((s, o) => s + totalCredits(o.rows), 0);
+    const n = this.toSend, items = n.reduce((s, o) => s + o.rows.length, 0), cr = n.reduce((s, o) => s + totalCredits(o.rows), 0);
     const needGroup = !this.notifier?.group;
     const one = this.mode === 'one';
     const skipped = this.noEmail, noMail = this.owners.filter((o) => o.rows.length > 0 && skipped.has(o.username)).length;
-    const noMailLine = noEmailLine(noMail, n.length + noMail);
+    const noMailLine = noEmailLine(noMail, this.picked.length + noMail);
+    const limitNotes = this.plan.notes;
+    // DC-125c (ADR 0013 decision 6): a deliberate re-nudge is named, whoever sent the last one.
+    const renudge = renudgeLine(n.filter((o) => o.nudgedRecently));
+    const othersUnknown = !this.demo && getOthersUnreadable(this.orgId) ? othersUnreadableLine() : '';
     return html`
       <calcite-dialog id="em-intro" modal @calciteDialogOpen=${this.focusMarked} heading="Before you send" width-scale="s" .open=${this.dialog === 'intro'} @calciteDialogClose=${this.onDialogClose('intro')}>
         <ul class="em-intro">
@@ -767,20 +880,17 @@ export class DcEmails extends LitElement {
         <calcite-button slot="footer-end" data-action="intro-ok" data-focus @click=${this.closeIntro}>Got it</calcite-button>
       </calcite-dialog>
 
-      <calcite-dialog id="em-consent" modal @calciteDialogOpen=${this.focusMarked} heading="Create the hidden group?" width-scale="s" .open=${this.dialog === 'consent'} @calciteDialogClose=${this.onDialogClose('consent')}>
-        <p>To send email, ArcGIS Online needs a group to send through. With your OK, we'll create one now in your org:</p>
-        <div class="em-group-card"><calcite-icon icon="group" scale="m" aria-hidden="true"></calcite-icon><div><b>${GROUP_TITLE}</b>
-          <ul class="em-settings"><li>Hidden: it doesn't appear in searches</li><li>Invitation-only: nobody can join by themselves</li><li>Members can't see each other</li><li>Only you can see it</li><li>Labelled “${GROUP_TITLE}”, so you can spot it</li></ul></div></div>
-        <p class="muted small">Created once and reused. You can remove it later from About, or in ArcGIS Online under Groups. Your test goes only to you.</p>
-        <calcite-button slot="footer-start" appearance="transparent" kind="neutral" data-focus @click=${() => this.closeDialog()}>Not now</calcite-button>
-        <calcite-button slot="footer-end" data-action="consent-yes" icon-start="group" @click=${() => { this.dialog = null; void this.sendTest(); }}>Create the group and send my test</calcite-button>
-      </calcite-dialog>
+      <dc-turn-on-sending .open=${this.dialog === 'turn-on'} @dc-turn-on-close=${() => { if (this.dialog === 'turn-on') this.closeDialog(); }}
+        @dc-turn-on-confirm=${() => { this.dialog = null; void this.turnOn(); }}></dc-turn-on-sending>
 
       <calcite-dialog id="em-confirm" modal @calciteDialogOpen=${this.focusMarked} heading=${one ? 'Ready to start?' : 'Ready to send?'} width-scale="s" .open=${this.dialog === 'confirm'} @calciteDialogClose=${() => { if (this.dialog === 'confirm') this.cancelConfirm(); }}>
         <div data-confirm>
           <p><b>${plural(n.length, 'owner', 'owners')}</b> will each get one email, covering <b>${plural(items, 'item', 'items')}</b> (about ${credit(cr)} credits a month between them). This is the real thing, not a test.${one ? ' You’ll see each email first and choose Send or Skip. Nothing goes out until you press Send on that owner.' : ''}</p>
           <p>We use your hidden group, “${GROUP_TITLE}”: each owner is added, sent their one email, and removed again straight after.${needGroup ? ' It doesn’t exist yet, so we create it first: hidden, invitation-only, and only you can see it.' : ''}</p>
+          ${limitNotes.length ? html`<p data-confirm-limit>${limitNotes.join(' ')}</p>` : nothing}
           ${noMailLine ? html`<p data-confirm-noemail>${noMailLine}</p>` : nothing}
+          ${renudge ? html`<p data-confirm-renudge>${renudge}</p>` : nothing}
+          ${othersUnknown ? html`<p data-confirm-others-unknown class="muted small">${othersUnknown}</p>` : nothing}
           ${this.testSentAt ? nothing : html`<calcite-notice open kind="warning" icon="exclamation-mark-triangle" scale="s"><div slot="message">You haven't sent yourself a test yet. It only takes a moment.</div></calcite-notice>`}
           ${this.renderLogChoice()}
         </div>

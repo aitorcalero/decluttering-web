@@ -136,3 +136,20 @@ export function assertLogAllowed(url: string, method: string, params: Params, ct
   }
   throw new BlockedRequest(`${m} ${mask(url)}`, 'not on the nudge log allow-list');
 }
+
+const OTHER_QUERY_PARAMS = ['f', 'where', 'outFields', 'returnGeometry', 'orderByFields', 'resultOffset', 'resultRecordCount'] as const;
+
+/**
+ * DC-125c (ADR 0013, decision 6): the only call the app may make on another admin's log: a GET query on a service that has
+ * the app's log shape. Everything else (applyEdits, addToDefinition, item update or delete, createService, a POST)
+ * throws before a request. Own-log reads and all writes stay on assertLogAllowed, which only knows the signed-in admin's log.
+ */
+export function assertOtherLogReadAllowed(url: string, method: string, params: Params, portal: string): 'query' {
+  const m = String(method).toUpperCase();
+  if (typeof url !== 'string' || !/^https:\/\//.test(url) || /[?#\s\\]|\.\.|%/.test(url)) throw new BlockedRequest(String(url), 'malformed url');
+  if (url.startsWith(`${portal.replace(/\/+$/, '')}/sharing/rest/`)) throw new BlockedRequest(mask(url), "another admin's log: a query only");
+  if (m !== 'GET') throw new BlockedRequest(`${m} ${mask(url)}`, "another admin's log: a GET query only");
+  if (!url.endsWith('/0/query') || !isLogServiceUrl(url.slice(0, -'/0/query'.length))) throw new BlockedRequest(mask(url), "another admin's log: a query on the app's own table shape only");
+  if (!onlyKeys(params, OTHER_QUERY_PARAMS)) throw new BlockedRequest(mask(url), 'unexpected query parameter');
+  return 'query';
+}

@@ -1,7 +1,7 @@
 // DC-019: one digest per owner, built from the template the admin edits. Pure strings, no DOM, so it is tested in Node.
 // Mirrors prototype D's email.js (tones, placeholders, the inline-styled item list, quick wins first, ADR 0010).
 // Links: only the org's own item pages. ArcGIS Online refuses notifications with links it can't validate
-// (COM_1132 "Invalid links in the message", docs/research/agol-notify-usage.md), so there is no app link until the app is hosted.
+// (COM_1132 "Invalid links in the message", docs/research/agol-notify-usage.md). The footer links to the hosted site (FB-16).
 import type { Priority } from '../../domain/priority';
 
 /** One ticked item, as the email needs it. `url` is the item's page in the admin's own org. */
@@ -144,9 +144,21 @@ export function fillBody(tpl: string, o: EmailOwner, ctx: Ctx): string {
   return out.replace(/\{itemList\}/g, () => itemListHtml(o.rows));
 }
 
+/** FB-16 (DC-125g): the public site, named in the footer. ArcGIS Online refuses messages with links it can't validate
+ * (COM_1132); in the dev-org test on 2026-10-22 it refused the github.io link, so the footer names the site in plain text
+ * without the scheme (user's choice). 'link' and 'off' stay for later. A refused test never unlocks owner sends (DC-125b). */
+export const SITE_URL = 'https://simongis.github.io/decluttering-web/';
+export const SITE_TEXT = 'simongis.github.io/decluttering-web';
+export type FooterSite = 'text' | 'link' | 'off';
+export const FOOTER_SITE: FooterSite = 'text';
+
 /** The email HTML: inline styles only, Arial, 600 px wide at most, with the "sent by" footer. */
-export function emailHtml(tpl: string, o: EmailOwner, ctx: Ctx): string {
-  const foot = `<p style="margin:18px 0 0;font-family:${FONT};font-size:12px;line-height:1.5;color:${C.muted};">Sent by ${esc(ctx.admin.name)} from ${esc(ctx.org.name)} with Decluttering, a free tool that runs in your browser. Nothing was changed or deleted.</p>`;
+export function emailHtml(tpl: string, o: EmailOwner, ctx: Ctx, opts: { site?: FooterSite } = {}): string {
+  const site = opts.site ?? FOOTER_SITE;
+  const name = site === 'link' ? `<a href="${SITE_URL}" style="color:${C.muted};text-decoration:underline;">Decluttering</a>`
+    : site === 'text' ? `Decluttering (${SITE_TEXT})`
+    : 'Decluttering';
+  const foot = `<p style="margin:18px 0 0;font-family:${FONT};font-size:12px;line-height:1.5;color:${C.muted};">Sent by ${esc(ctx.admin.name)} from ${esc(ctx.org.name)} with ${name}, a free tool that runs in your browser. Nothing was changed or deleted.</p>`;
   return `<div style="max-width:600px;margin:0;font-family:${FONT};font-size:15px;line-height:1.55;color:${C.text};">${fillBody(tpl, o, ctx)}${foot}</div>`;
 }
 

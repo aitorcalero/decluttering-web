@@ -134,9 +134,15 @@ flowchart LR
 
 ![Your data: your browser talks only to your own ArcGIS Online org](docs/images/about-data.png)
 
-## This hosted copy is review-only (for now)
+## Sending is switched on by each admin
 
-The public site can scan and review any org you sign in to, but **sending is switched off**: no test emails, no owner emails, no group and no log. Sending is planned as a deliberate opt-in by each org's administrator, inside the app, after a test email to themselves. Until then it is only enabled in builds made for specific orgs, so that nobody can email a whole org by accident. See *Run your own copy*.
+Anyone can sign in and review. Sending is off until **you** turn it on for yourself, inside the app:
+
+1. On the checklist after sign-in, **Sending in this org** › **Turn on sending**. The app sets up one small hidden group that only you can see. Nothing is sent until you choose.
+2. **Send yourself a test first.** Sending to owners unlocks for the session only after your own test has gone through, so the email you check is the one that goes out. Each new session asks again.
+3. Send. Each owner gets one email, at most once every six months (counting every admin's nudges in your org). A run sends to at most 40 owners, at most 100 a day, a couple of seconds apart, and stops at the first problem ArcGIS reports.
+
+**Turn off sending** (on the same checklist row, or About › App data) removes your hidden group. Your nudge log stays, so owners you nudged keep resting.
 
 ## Who can use it
 
@@ -146,8 +152,12 @@ After you sign in, the app shows a short checklist of what your account can do h
 |---|---|
 | Review the whole org | an admin role that can view all items and members (`portal:admin:viewItems`, `portal:admin:viewUsers`) |
 | See "last used" | access to the org's usage reports |
-| Send nudges (own builds today; an in-app opt-in is planned) | create groups and add members to them (`portal:user:createGroup`, `portal:admin:assignToGroups`) |
+| Send nudges (after you turn sending on for yourself) | create groups and add members to them (`portal:user:createGroup`, `portal:admin:assignToGroups`) |
 | Anyone else | review their own layers |
+
+### If your organisation only allows approved apps
+
+Some organisations only let members sign in to approved apps (ArcGIS Online › Organization › Settings › Security › Approved apps). If that is yours, an administrator needs to add Decluttering to that list first. We'll add exact steps once we've confirmed them in an organisation with the setting on; the About page has the same note. See [Esri's security settings page](https://doc.arcgis.com/en/arcgis-online/administer/configure-security.htm).
 
 ## Run your own copy
 
@@ -160,7 +170,7 @@ npm run dev               # http://localhost:5173
 ```
 
 1. **Register the app in ArcGIS Online.** Content › New item › Developer credentials › OAuth 2.0 credentials. Add the redirect URLs `http://localhost:5173/` and your site's address (for example `https://<you>.github.io/decluttering-web/`). Put the client ID in `VITE_ARCGIS_CLIENT_ID`. It is public by design; there is no secret.
-2. **Allow sending in your build** (optional): add your org id to `VITE_WRITABLE_ORG_IDS`. Send yourself a test before turning on `VITE_ALLOW_OWNER_SENDS`.
+2. **Choose where sending can be turned on** with `VITE_SENDING`: empty or `off` (review-only), `list` (only the org ids in `VITE_WRITABLE_ORG_IDS`) or `opt-in` (any org; each admin turns it on for themselves).
 
 Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`.
 

@@ -8,7 +8,7 @@ import type { Data, Dependency, Service } from '../domain/types';
 import { scanSession, type DataState } from '../scan/session';
 import { createRequest } from '../scan/request';
 import type { PhaseId, RequestFn, ScanProgress, ScanStages } from '../scan/types';
-import { createSessionNudgeLog, getNudgeSends, seededNudgeLog, setNudgeLog, setNudgeSummary, type NudgeLog } from '../log';
+import { createSessionNudgeLog, getNudgeSends, mergeLogReads, seededNudgeLog, setNudgeLog, setNudgeSources, setNudgeSummary, type NudgeLog, type OthersRead } from '../log';
 import { sinceNudges } from '../domain/outcomes';
 
 export const PHASE_ORDER: PhaseId[] = ['find', 'size', 'views', 'usage', 'owners', 'deps'];
@@ -102,16 +102,21 @@ export function tapRequest(request: RequestFn, tap: (e: ScanTap) => void): Reque
  * DC-017: reads the app's nudge log, if there is one, into the in-memory store the review uses. Reads only (a search of
  * the admin's own items, then a query of the app's own table), through the log's own allow-list, not the scan's. Only
  * for an admin in a writable org: the log can only have been created there, and a read-only org (DC-058) never sees a
- * service call. Never throws: without a log, or if it can't be read, nothing changes.
+ * service call. DC-125c: other admins' logs in the org are read too (query only) and merged in, with who sent each; if one
+ * can't be read the flag is kept for the UI. Never throws: without a log, or if it can't be read, nothing changes.
  */
 export async function readNudgeLog(access: Pick<AccessInfo, 'mode' | 'writable' | 'orgId' | 'username'>, make: () => NudgeLog): Promise<number | null> {
   if (access.mode !== 'admin' || !access.writable) return null;
   try {
     const log = make();
-    if (!(await log.find())) return null;
-    const latest = await log.read();
-    setNudgeLog(access.orgId, latest);
-    return latest.size;
+    const own = (await log.find()) ? await log.read() : null;
+    // DC-125c (ADR 0013, decision 6): other admins' logs count towards the six-month rest. Query only; never fails the scan.
+    const others = await (log.readOthers?.() ?? Promise.resolve<OthersRead>({ reads: [], unreadable: false })).catch((): OthersRead => ({ reads: [], unreadable: true }));
+    if (!own && !others.reads.length && !others.unreadable) return null;
+    const merged = mergeLogReads(own, others.reads, access.username);
+    setNudgeLog(access.orgId, merged.latest);
+    setNudgeSources(access.orgId, merged.by, others.unreadable);
+    return merged.latest.size;
   } catch { return null; }
 }
 

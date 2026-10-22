@@ -18,6 +18,13 @@ test('About shows the diagrams, the GitHub link and the contact link', async ({ 
   await expect(link).toHaveAttribute('rel', /noopener/);
 });
 
+// DC-125f: the admin guide for orgs that only allow approved apps.
+test('About has the administrator guide for approved apps', async ({ page }) => {
+  await page.goto('/#/about');
+  await expect(page.getByRole('heading', { name: 'For administrators: approving Decluttering' })).toBeVisible();
+  await expect(page.locator('dc-about a.about-esri')).toHaveAttribute('href', /configure-security\.htm/);
+});
+
 // Screenshots for review: only when SHOTS_DIR is set.
 for (const [w, h] of [[1280, 900], [400, 900]] as const) {
   for (const scheme of ['light', 'dark'] as const) {

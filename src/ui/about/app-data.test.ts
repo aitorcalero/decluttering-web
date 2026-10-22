@@ -136,8 +136,8 @@ describe('the words', () => {
     expect(COPY.logConfirm(null)).toContain('with its rows.');
   });
   it('say only the app own group goes', () => {
-    expect(COPY.groupConfirm).toContain('Only the app\'s own group goes: “Decluttering notifications”');
-    expect(COPY.groupConfirm).toContain("we'll ask before creating it again");
+    expect(COPY.groupConfirm).toContain('remove your hidden group');
+    expect(COPY.groupConfirm).toContain('Your nudge log stays');
   });
   it('count sends, and use no exclamation marks', () => {
     expect(COPY.logNote(0)).toBe('0 sends recorded.');

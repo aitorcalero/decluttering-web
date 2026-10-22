@@ -102,7 +102,7 @@ export class DcAppData extends LitElement {
       <calcite-dialog modal heading=${COPY.groupConfirmHeading} width-scale="s" .open=${this.dialog === 'group'}
         @calciteDialogClose=${() => { if (!this.working && this.dialog === 'group') this.dialog = null; }}>
         <p>${COPY.groupConfirm}</p>
-        <calcite-button slot="footer-start" appearance="transparent" kind="neutral" @click=${() => { this.dialog = null; }}>${COPY.keep}</calcite-button>
+        <calcite-button slot="footer-start" appearance="transparent" kind="neutral" data-action="keep-group" @click=${() => { this.dialog = null; }}>${COPY.groupKeep}</calcite-button>
         <calcite-button slot="footer-end" kind="danger" data-action="confirm-remove-group" ?loading=${this.working} ?disabled=${this.sending}
           @click=${() => void this.confirm('group')}>${COPY.groupConfirmButton}</calcite-button>
       </calcite-dialog>

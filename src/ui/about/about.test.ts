@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ABOUT_SECTIONS, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, REPO_URL, backLabel, issuesLine, repoLine } from './content';
+import { ABOUT_SECTIONS, APPROVED_APPS_URL, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, REPO_URL, backLabel, issuesLine, repoLine } from './content';
 import { PRESETS } from '../../domain/stale';
 
 const sentences = (s: string) => s.split(/(?<=[.?!])\s+/).filter(Boolean).length;
 
 describe('About content (DC-021)', () => {
-  it('has the seven sections, each with a lead of at most two sentences and some detail', () => {
-    expect(ABOUT_SECTIONS.map((s) => s.id)).toEqual(['what', 'stale', 'views', 'data', 'email', 'touches', 'open']);
+  it('has the eight sections, each with a lead of at most two sentences and some detail', () => {
+    expect(ABOUT_SECTIONS.map((s) => s.id)).toEqual(['what', 'stale', 'views', 'data', 'email', 'touches', 'approved', 'open']);
     for (const s of ABOUT_SECTIONS) {
       expect(sentences(s.lead), s.id).toBeLessThanOrEqual(2);
       expect(s.detail.length, s.id).toBeGreaterThan(0);
@@ -61,5 +61,16 @@ describe('About additions (DC-110)', () => {
     expect(FLOWS.email.steps.map((s) => s.icon)).toEqual(['user', 'group', 'envelope', 'table']);
     expect(FLOWS.email.label).toMatch(/hidden group/);
     expect(FLOWS.data.label).toMatch(/own ArcGIS Online org/);
+  });
+});
+
+describe('About admin guide (DC-125f)', () => {
+  it('has a section for administrators that links to the Esri security page and is honest about the steps', () => {
+    const s = ABOUT_SECTIONS.find((x) => x.id === 'approved');
+    expect(s?.title).toBe('For administrators: approving Decluttering');
+    expect(APPROVED_APPS_URL).toBe('https://doc.arcgis.com/en/arcgis-online/administer/configure-security.htm');
+    const text = JSON.stringify(s);
+    expect(text).toContain('Approved apps');
+    expect(text).toContain("We'll add exact steps here");
   });
 });

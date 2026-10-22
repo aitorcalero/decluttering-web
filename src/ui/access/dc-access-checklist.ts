@@ -1,7 +1,7 @@
 // DC-111 (FB-67): "What can I do here?" A short, friendly checklist of what this account can do in Decluttering, with a
 // tick or a gentle cross per line and a one-line summary. No network: it is worked out from facts sign-in already holds.
-// <dc-access-checklist>: props mode, usageReadable, writable, dismissible, announce. Event: dc-access-dismiss.
-// <dc-access-dialog>: the same list in a Calcite dialog (header menu entry). Props: open, mode, usageReadable, writable. Event: dc-access-close.
+// <dc-access-checklist>: props mode, usageReadable, mayOptIn (ADR 0013), optedIn, dismissible, announce. Events: dc-access-dismiss, dc-turn-on-sending, dc-turn-off-sending.
+// <dc-access-dialog>: the same list in a Calcite dialog (header menu entry). Props: open, mode, usageReadable, mayOptIn, optedIn. Event: dc-access-close.
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import '@esri/calcite-components/dist/components/calcite-icon';
@@ -18,7 +18,10 @@ const STATE_WORD = { yes: 'Yes', no: 'Not available', neutral: 'Note' } as const
 export class DcAccessChecklist extends LitElement {
   @property() mode: AccessMode = 'admin';
   @property({ type: Boolean }) usageReadable = true;
-  @property({ type: Boolean }) writable = true;
+  /** ADR 0013: an admin in this org may turn sending on (VITE_SENDING). */
+  @property({ type: Boolean }) mayOptIn = false;
+  /** This admin has turned sending on (their own app group exists). */
+  @property({ type: Boolean }) optedIn = false;
   /** DC-121: the signed-in user's profile email. undefined = not known (no row); empty = none on file. */
   @property() email?: string;
   @property({ type: Boolean }) dismissible = false;
@@ -31,13 +34,18 @@ export class DcAccessChecklist extends LitElement {
     const icon = c.id === 'org-send' && c.state === 'neutral' ? 'lock' : ICON[c.id];
     return html`<li class="ac-row" data-cap=${c.id} data-state=${c.state}>
       <calcite-icon class="ac-icon" icon=${icon} scale="m" aria-hidden="true"></calcite-icon>
-      <span class="ac-text"><strong>${c.label}</strong><span>${c.line}</span></span>
+      <span class="ac-text"><strong>${c.label}</strong><span>${c.line}</span>${c.action === 'turn-on'
+        ? html`<calcite-button data-action="turn-on-sending" scale="s" appearance="outline" kind="brand" icon-start="group"
+            @click=${() => this.dispatchEvent(new CustomEvent('dc-turn-on-sending', { bubbles: true, composed: true }))}>Turn on sending</calcite-button>`
+        : c.action === 'turn-off'
+        ? html`<calcite-button data-action="turn-off-sending" scale="s" appearance="transparent" kind="neutral"
+            @click=${() => this.dispatchEvent(new CustomEvent('dc-turn-off-sending', { bubbles: true, composed: true }))}>Turn off sending</calcite-button>` : null}</span>
       <span class="ac-mark" data-mark=${c.state}><calcite-icon icon=${STATE_ICON[c.state]} scale="m" aria-hidden="true"></calcite-icon><span class="dc-sr">${STATE_WORD[c.state]}</span></span>
     </li>`;
   }
 
   protected override render() {
-    const c = capabilities(privilegesOfMode(this.mode), this.usageReadable, this.writable);
+    const c = capabilities(privilegesOfMode(this.mode), this.usageReadable, this.mayOptIn, this.optedIn);
     const mail = emailCapability(this.email);
     const items = mail ? [...c.items, mail] : c.items;
     return html`
@@ -59,7 +67,8 @@ export class DcAccessDialog extends LitElement {
   @property({ type: Boolean }) open = false;
   @property() mode: AccessMode = 'admin';
   @property({ type: Boolean }) usageReadable = true;
-  @property({ type: Boolean }) writable = true;
+  @property({ type: Boolean }) mayOptIn = false;
+  @property({ type: Boolean }) optedIn = false;
   @property() email?: string;
 
   protected override createRenderRoot(): HTMLElement { return this; }
@@ -68,7 +77,7 @@ export class DcAccessDialog extends LitElement {
     return html`
       <calcite-dialog data-access="dialog" heading="What can I do here?" scale="s" width-scale="s" ?open=${this.open}
         @calciteDialogClose=${() => this.dispatchEvent(new CustomEvent('dc-access-close', { bubbles: true, composed: true }))}>
-        <dc-access-checklist .mode=${this.mode} .usageReadable=${this.usageReadable} .writable=${this.writable} .email=${this.email}></dc-access-checklist>
+        <dc-access-checklist .mode=${this.mode} .usageReadable=${this.usageReadable} .mayOptIn=${this.mayOptIn} .optedIn=${this.optedIn} .email=${this.email}></dc-access-checklist>
         <calcite-button slot="footer-end" data-action="access-close" @click=${() => this.dispatchEvent(new CustomEvent('dc-access-close', { bubbles: true, composed: true }))}>Close</calcite-button>
       </calcite-dialog>`;
   }

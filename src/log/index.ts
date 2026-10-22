@@ -1,10 +1,10 @@
-export { LOG_TITLE, LOG_TAG, LOG_FIELDS, LOG_NAME_RE, isLogServiceUrl, assertLogAllowed, BlockedRequest } from './guard';
+export { LOG_TITLE, LOG_TAG, LOG_FIELDS, LOG_NAME_RE, isLogServiceUrl, assertLogAllowed, assertOtherLogReadAllowed, BlockedRequest } from './guard';
 export type { LogOp, LogGuardContext } from './guard';
-export { createNudgeLog, isAppLog, tableDefinition, LOG_DESCRIPTION, LOG_SNIPPET } from './nudge-log';
-export type { NudgeLog, LogTable, NudgeLogOptions } from './nudge-log';
-export { buildRow, latestByOwner, applyNudgeLog, withSend, APP_VERSION, sendsOf, readRows, logRead } from './rows';
-export type { RowInput, LogAttributes, LogRead } from './rows';
-export { setNudgeLog, forgetNudgeLog, getNudgeLog, getNudgeSends, onNudgeLogChange, setNudgeSummary, getNudgeSummary } from './store';
+export { createNudgeLog, isAppLog, isAppLogAnyOwner, guardedOtherSend, tableDefinition, LOG_DESCRIPTION, LOG_SNIPPET } from './nudge-log';
+export type { NudgeLog, OthersRead, LogTable, NudgeLogOptions } from './nudge-log';
+export { buildRow, latestByOwner, applyNudgeLog, withSend, APP_VERSION, sendsOf, readRows, logRead, mergeLogReads } from './rows';
+export type { RowInput, LogAttributes, LogRead, MergedLog, NudgeSource } from './rows';
+export { setNudgeLog, setNudgeSources, forgetNudgeLog, getNudgeLog, getNudgeSends, getNudgeSources, getOthersUnreadable, onNudgeLogChange, setNudgeSummary, getNudgeSummary } from './store';
 export type { NudgeSummary } from './store';
 export { getLogChoice, setLogChoice } from './choice';
 export type { LogChoice } from './choice';

@@ -5,8 +5,8 @@
 import { GROUP_TITLE, guardNotifyRequest } from './guard';
 import { SEND_THUMBNAILS, createThumbnailLoader, type ParamValue, type ThumbnailLoader } from './thumbnail';
 import type { RequestFn } from '../scan/types';
-import { WRITABLE_ORG_IDS } from '../auth/config';
-import { writeAllowed, READ_ONLY_NOTE } from '../auth/write-allowed';
+import { READ_ONLY_NOTE } from '../auth/write-allowed';
+import { mayOptIn, type SendingMode } from '../auth/sending';
 
 export { GROUP_TITLE };
 
@@ -62,8 +62,10 @@ export interface GroupNotifierOptions {
   request: RequestFn;
   /** The signed-in org's id (portals/self.id). The notifier refuses to exist unless it is in `writableOrgIds`. */
   orgId: string;
-  /** Orgs this build may write to. Defaults to VITE_WRITABLE_ORG_IDS; empty means no writes anywhere. */
+  /** Orgs that may opt in when the mode is `list`. Defaults to VITE_WRITABLE_ORG_IDS; given alone (tests) it means `list` mode. */
   writableOrgIds?: string | readonly string[];
+  /** Overrides VITE_SENDING (tests only). */
+  sendingMode?: SendingMode;
   /** The signed-in username, if already known (otherwise read from portals/self). */
   self?: string;
   now?: () => Date;
@@ -125,9 +127,8 @@ export interface GroupNotifier {
 }
 
 export function createGroupNotifier(opts: GroupNotifierOptions): GroupNotifier {
-  // Default deny (DC-058): no notifier, and so no route to any write, unless this org is explicitly writable.
-  const writable = opts.writableOrgIds ?? WRITABLE_ORG_IDS;
-  if (!writeAllowed(opts.orgId, writable)) throw new WritesDisabled();
+  // Default deny (DC-058, ADR 0013): no notifier, and so no route to any write, unless this org may opt in to sending.
+  if (!mayOptIn(opts.orgId, opts)) throw new WritesDisabled();
   const orgId = opts.orgId.trim();
   const now = opts.now ?? (() => new Date());
   let self: string | null = opts.self ?? null;

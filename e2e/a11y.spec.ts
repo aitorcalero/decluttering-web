@@ -392,7 +392,7 @@ const OVERLAYS: { name: string; open: (p: Page) => Promise<void>; sel: string; e
   { name: 'Emails: Before you send dialog', sel: '#em-intro', emails: true, open: async (p) => { await p.locator('calcite-action[text="Before you send"]').click(); } },
   { name: 'Emails: Add a link dialog', sel: '#em-link-dlg', emails: true, open: async (p) => { await p.locator('calcite-button[label="Link"]').click(); } },
   { name: 'Emails: Ready to send dialog', sel: '#em-confirm', emails: true, open: async (p) => { await p.locator('dc-emails [data-action="send"]').click(); } },
-  { name: 'Emails: Create the hidden group dialog', sel: '#em-consent', emails: true, open: async (p) => { await p.locator('dc-emails [data-action="test"]').click(); } },
+  { name: 'Emails: Turn on sending dialog', sel: '#turn-on-dialog', emails: true, open: async (p) => { await p.locator('dc-emails [data-action="test"]').click(); } },
   { name: 'Emails: Switch tone dialog', sel: '#em-tone-dlg', emails: true, open: async (p) => {
     await p.locator('#em-subject').evaluate((e) => { (e as HTMLInputElement).value = 'My own subject'; e.dispatchEvent(new CustomEvent('calciteInputInput', { bubbles: true })); });
     await p.locator('#em-tone calcite-segmented-control-item').nth(1).click();

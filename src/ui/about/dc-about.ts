@@ -6,7 +6,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { hrefOf, type Route } from '../../routes/router';
 import '@esri/calcite-components/dist/components/calcite-icon';
 import '@esri/calcite-components/dist/components/calcite-button';
-import { ABOUT_INTRO, ABOUT_SECTIONS, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, backLabel, issuesLine, repoLine, type Block, type FlowId } from './content';
+import { ABOUT_INTRO, ABOUT_SECTIONS, APPROVED_APPS_LINK_TEXT, APPROVED_APPS_URL, CONTACT_LINK_TEXT, CONTACT_URL, FLOWS, backLabel, issuesLine, repoLine, type Block, type FlowId } from './content';
 import './dc-app-data';
 import type { AppDataOrg } from './app-data';
 import type { GroupNotifier } from '../../notify';
@@ -76,6 +76,7 @@ export class DcAbout extends LitElement {
         ${s.detail.length ? html`<details class="about-more" data-section=${s.id}>
           <summary>More detail</summary>
           <div class="about-detail">${s.detail.map((b) => this.block(b))}
+            ${s.id === 'approved' ? html`<p><a class="about-esri" href=${APPROVED_APPS_URL} target="_blank" rel="noopener noreferrer">${APPROVED_APPS_LINK_TEXT}<span class="about-sr"> (opens in a new tab)</span></a></p>` : nothing}
             ${s.id === 'open' ? this.issues() : nothing}
             ${s.id === 'open' ? html`<p><calcite-button class="about-contact" href=${CONTACT_URL} target="_blank" rel="noopener noreferrer" appearance="outline" scale="s" icon-start="envelope">${CONTACT_LINK_TEXT}<span class="about-sr"> (opens in a new tab)</span></calcite-button></p>` : nothing}
           </div>

@@ -461,6 +461,24 @@ describe('read-only orgs (DC-058)', () => {
     expect(() => createGroupNotifier({ request: fakeOrg().request, orgId: ORG })).toThrow(WritesDisabled);
   });
 
+  it('ADR 0013: off refuses every org, list refuses unlisted ones, opt-in allows any org with an id', () => {
+    const org = fakeOrg();
+    expect(() => createGroupNotifier({ request: org.request, orgId: ORG, sendingMode: 'off', writableOrgIds: [ORG] })).toThrow(WritesDisabled);
+    expect(() => createGroupNotifier({ request: org.request, orgId: ORG, sendingMode: 'list', writableOrgIds: ['SomeOtherOrg1234'] })).toThrow(WritesDisabled);
+    expect(() => createGroupNotifier({ request: org.request, orgId: ORG, sendingMode: 'list' })).toThrow(WritesDisabled);
+    expect(() => createGroupNotifier({ request: org.request, orgId: '', sendingMode: 'opt-in' })).toThrow(WritesDisabled);
+    expect(() => createGroupNotifier({ request: org.request, orgId: ORG, sendingMode: 'list', writableOrgIds: [ORG] })).not.toThrow();
+    expect(() => createGroupNotifier({ request: org.request, orgId: ORG, sendingMode: 'opt-in' })).not.toThrow();
+    expect(org.calls).toEqual([]);
+  });
+
+  it('ADR 0013: the session notifier honours the mode too, and builds no sender when refused', () => {
+    const s = sender();
+    expect(() => createSessionNotifier(null, { portal: 'https://www.arcgis.com', self: ME, orgId: ORG, sendingMode: 'off', writableOrgIds: [ORG], send: s.send })).toThrow(WritesDisabled);
+    expect(() => createSessionNotifier(null, { portal: 'https://www.arcgis.com', self: ME, orgId: ORG, sendingMode: 'opt-in', send: s.send })).not.toThrow();
+    expect(s.seen).toEqual([]);
+  });
+
   it('the session notifier refuses before building a sender', () => {
     const s = sender();
     expect(() => createSessionNotifier(null, { portal: 'https://www.arcgis.com', self: ME, orgId: ORG, writableOrgIds: [], send: s.send })).toThrow(WritesDisabled);
