@@ -10,6 +10,8 @@ It runs entirely in your browser. There is no Decluttering server, and nothing g
 
 > **Try it without signing in:** open the site and choose **Try the demo**. It plays a full scan of a made-up council's org, then lets you review the results and write the emails. Nothing is sent and nothing leaves your browser.
 
+> **New, and built by one person.** Decluttering is version 1, so treat it as early days. Scanning and review only read your org. Emails go out only after you turn sending on and send yourself a test, and the app never deletes, moves or changes anyone's items. It's provided as is (see [Disclaimer](#disclaimer)); please [raise an issue](https://github.com/simongis/decluttering-web/issues) if something looks off. Ideas, feedback and collaborators are very welcome (see [Contributing and support](#contributing-and-support)).
+
 ![Review: the rule on the left, the stale zone chart and the owners on the right](docs/images/review.png)
 
 ---
@@ -200,9 +202,11 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`.
 - The app never deletes, unshares or changes anyone's items. What an owner does after a nudge is their decision.
 - ArcGIS and Esri are trademarks of Esri. They are used here only to describe what the app works with.
 
-## Support
+## Contributing and support
 
-Decluttering is offered as is, without formal support. Questions and problems are welcome on this repository's **Issues** page. For security issues, see `SECURITY.md`.
+Contributions and collaboration are welcome. If you're an ArcGIS Online admin, the most useful thing you can do is try it on your own org and say what worked, what didn't, and what you'd want next. Bug reports, ideas, wording fixes and pull requests are all welcome on this repository's **Issues** page. For anything bigger, open an issue first so we can talk it through. If you'd like to collaborate more closely, reach out on [LinkedIn](https://www.linkedin.com/in/simongis/).
+
+Decluttering is offered as is, without formal support. For security issues, see `SECURITY.md`.
 
 ## Licence
 
