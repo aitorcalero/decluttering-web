@@ -1,0 +1,58 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { en } from './en';
+import { es } from './es';
+import { DEFAULT_LOCALE, formatNumber, getLocale, isLocale, matchLocale, setLocale, t, tn } from './index';
+
+afterEach(async () => { await setLocale(DEFAULT_LOCALE, false); });
+
+describe('catalogues', () => {
+  it('Spanish has exactly the English keys', () => {
+    expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort());
+  });
+  it('every message keeps the same {placeholders} in every language', () => {
+    const names = (m: unknown) => (typeof m === 'string' ? m : Object.values(m as object).join(' ')).match(/\{\w+\}/g)?.sort().join() ?? '';
+    for (const k of Object.keys(en) as (keyof typeof en)[]) expect(names(es[k]), k).toBe(names(en[k]));
+  });
+});
+
+describe('matchLocale', () => {
+  it('uses the first supported language, ignoring the region', () => {
+    expect(matchLocale(['fr-FR', 'es-MX', 'en'])).toBe('es');
+    expect(matchLocale(['ES'])).toBe('es');
+  });
+  it('falls back to English', () => {
+    expect(matchLocale([])).toBe('en');
+    expect(matchLocale(['de', 'fr'])).toBe('en');
+  });
+  it('isLocale rejects anything else', () => {
+    expect(isLocale('es')).toBe(true);
+    expect(isLocale('xx')).toBe(false);
+    expect(isLocale(null)).toBe(false);
+  });
+});
+
+describe('t', () => {
+  it('fills placeholders and leaves unknown ones visible', () => {
+    expect(t('steps.line', { n: 2, total: 3, label: 'Review' })).toBe('Step 2 of 3: Review');
+    expect(t('steps.line', { n: 2 })).toBe('Step 2 of {total}: {label}');
+  });
+  it('switches language, sets <html lang> and tells subscribers', async () => {
+    await setLocale('es', false);
+    expect(getLocale()).toBe('es');
+    expect(t('steps.review')).toBe('Revisión');
+    expect(formatNumber(1234.5)).toBe(new Intl.NumberFormat('es').format(1234.5));
+    if (typeof document !== 'undefined') expect(document.documentElement.lang).toBe('es');
+  });
+});
+
+describe('tn', () => {
+  it('picks the plural form for the current language', async () => {
+    const forms = { one: '{count} map', other: '{count} maps' };
+    const orig = en as Record<string, unknown>;
+    orig['test.maps'] = forms;
+    try {
+      expect(tn('test.maps' as never, 1)).toBe('1 map');
+      expect(tn('test.maps' as never, 5)).toBe('5 maps');
+    } finally { delete orig['test.maps']; }
+  });
+});

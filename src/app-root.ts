@@ -26,6 +26,9 @@ import { mergeUsageWindow } from './scan/pipeline';
 import { countSweeps, onCountSweepsChange, setCountSweeps } from './cache/settings';
 import '@esri/calcite-components/dist/components/calcite-navigation-user';
 import '@esri/calcite-components/dist/components/calcite-avatar';
+import '@esri/calcite-components/dist/components/calcite-select';
+import '@esri/calcite-components/dist/components/calcite-option';
+import { LOCALES, LOCALE_NAMES, getLocale, isLocale, onLocaleChange, setLocale, t } from './i18n';
 import '@esri/calcite-components/dist/components/calcite-popover';
 import './ui/about';
 import './ui/access/dc-access-checklist';
@@ -219,6 +222,7 @@ export class AppRoot extends LitElement {
     this.narrowQuery.addEventListener('change', this.onNarrow);
     this.offSweeps = onCountSweepsChange(this.onSweepsSetting);
     this.offSolo = onSoloChange(() => this.requestUpdate());
+    this.offLocale = onLocaleChange(() => this.requestUpdate());
     void this.ensureDemo();
     if (import.meta.env.DEV && await this.maybeSimulate()) { this.signingIn = false; return; }
     if (import.meta.env.DEV && /^#\/probe-usage\/?$/.test(window.location.hash)) { await (await import('./dev/usage-probe')).defineUsageProbe(); this.probe = true; this.signingIn = false; return; }
@@ -280,8 +284,15 @@ export class AppRoot extends LitElement {
     clearTimeout(this.dotsTimer);
     this.offSweeps?.(); this.offSweeps = null;
     this.offSolo?.(); this.offSolo = null;
+    this.offLocale?.(); this.offLocale = null;
     super.disconnectedCallback();
   }
+
+  private offLocale: (() => void) | null = null;
+  private onLang = (e: Event) => {
+    const v = (e.target as HTMLInputElement).value;
+    if (isLocale(v)) void setLocale(v);
+  };
 
   /**
    * DC-113 (FB-69): the short first-visit tour of Review (lazy chunk, src/ui/tour/). It opens by itself once, only while Review is on
@@ -864,6 +875,9 @@ export class AppRoot extends LitElement {
           <div slot="logo" class="dc-logo"><a class="dc-home" data-action="home" href=${hrefOf(homeRoute(this.route, this.signedIn))} aria-label="Decluttering, home" @click=${this.goHome}><img src="${import.meta.env.BASE_URL}brand-mark.svg" alt=""><span class="dc-name">Decluttering</span></a>${this.orgName ? html`<span class="dc-org">${this.orgName}</span>` : nothing}</div>
           <calcite-button slot="content-end" class="dc-about-link" data-action="about" appearance="transparent" kind="neutral" icon-start="information"
             href=${hrefOf('about')} label="About Decluttering" ?active=${this.route === 'about'}>${this.narrow ? nothing : 'About'}</calcite-button>
+          <calcite-select slot="content-end" class="dc-lang" data-action="language" scale="s" label=${t('lang.label')} @calciteSelectChange=${this.onLang}>
+            ${LOCALES.map((l) => html`<calcite-option value=${l} ?selected=${l === getLocale()}>${LOCALE_NAMES[l]}</calcite-option>`)}
+          </calcite-select>
           ${this.renderUser()}
         </calcite-navigation>
         ${this.access && !this.inDemo ? html`<dc-access-dialog ?open=${this.accessOpen} .mode=${this.access.mode} .usageReadable=${this.access.usageReadable} .mayOptIn=${this.access.writable} .optedIn=${this.sendingOn} .email=${this.access.email} @dc-turn-on-sending=${this.askTurnOn} @dc-turn-off-sending=${this.askTurnOff} @dc-access-close=${() => { this.accessOpen = false; }}></dc-access-dialog>

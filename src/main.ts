@@ -6,6 +6,9 @@ import '@esri/calcite-components/dist/components/calcite-button';
 import './styles/tokens.css';
 import './styles/app.css';
 import './styles/scan.css';
-import './app-root';
+import { initLocale } from './i18n';
+
+// The saved or browser language is loaded before the app renders, so the first paint is already in that language.
+void initLocale().finally(() => import('./app-root'));
 
 setAssetPath('https://js.arcgis.com/calcite-components/3.3.3/assets');
