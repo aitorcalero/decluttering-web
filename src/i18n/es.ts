@@ -1,16 +1,9 @@
 import type { Message, MessageKey } from './en';
+import { esCore } from './es/core';
+import { esShell } from './es/shell';
+import { esScan } from './es/scan';
+import { esReview } from './es/review';
+import { esEmails } from './es/emails';
+import { esAbout } from './es/about';
 
-export const es: Record<MessageKey, Message> = {
-  'lang.label': 'Idioma',
-  'steps.nav': 'Pasos',
-  'steps.scan': 'Análisis',
-  'steps.review': 'Revisión',
-  'steps.emails': 'Correos',
-  'steps.scanHint': 'La demo rápida se salta el análisis.',
-  'steps.reviewHint': 'La revisión se abre cuando el análisis haya encontrado tus capas.',
-  'steps.emailsHint': 'Marca a un propietario en la revisión para escribir correos.',
-  'steps.line': 'Paso {n} de {total}: {label}',
-  'steps.count': 'paso {n} de {total}',
-  'steps.linkLabel': '{label}, paso {n}',
-  'steps.disabledLabel': '{label}, paso {n}, todavía no disponible. {hint}',
-};
+export const es: Record<MessageKey, Message> = { ...esCore, ...esShell, ...esScan, ...esReview, ...esEmails, ...esAbout };
