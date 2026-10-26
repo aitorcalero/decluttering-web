@@ -11,7 +11,12 @@ describe('catalogues', () => {
   });
   it('every message keeps the same {placeholders} in every language', () => {
     const names = (m: unknown) => (typeof m === 'string' ? m : Object.values(m as object).join(' ')).match(/\{\w+\}/g)?.sort().join() ?? '';
-    for (const k of Object.keys(en) as (keyof typeof en)[]) expect(names(es[k]), k).toBe(names(en[k]));
+    for (const k of Object.keys(en) as (keyof typeof en)[]) {
+      // A singular form may write the number out ("1 person") instead of using {count}; nothing else may go missing or be invented.
+      const want = names(en[k]).split(',').filter(Boolean), got = names(es[k]).split(',').filter(Boolean);
+      for (const p of got) expect(want, k).toContain(p);
+      for (const p of want) if (p !== '{count}') expect(got, k).toContain(p);
+    }
   });
 });
 
