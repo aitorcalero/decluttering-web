@@ -119,7 +119,7 @@ export const esScan: Record<keyof typeof enScan, Message> = {
   'scan.map.legend.very': 'Mucho tiempo sin uso',
   'scan.map.legend.not-stale': 'Con uso reciente',
   'scan.map.legend.storage-size': 'Cuanto mayor el punto, más almacenamiento',
-  'scan.map.legend.used': 'Anillo: usado por mapas o aplicaciones. Gris en la zona: demasiado pequeño o usado por demasiados mapas o aplicaciones',
+  'scan.map.legend.used': 'Anillo: usado por mapas o aplicaciones. Gris en la zona: demasiado pequeño, usado por demasiados mapas o aplicaciones, o con último uso desconocido',
   'scan.map.legend.pending': 'Tamaño aún sin medir',
   'scan.map.small-under': { one: '1 {layer} de menos de {mb} MB ({credits} al mes)', other: '{count} {layer} de menos de {mb} MB ({credits} al mes)' },
   'scan.map.small-layer-one': 'capa',

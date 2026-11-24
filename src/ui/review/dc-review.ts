@@ -13,6 +13,9 @@ import '@esri/calcite-components/dist/components/calcite-link';
 import '@esri/calcite-components/dist/components/calcite-notice';
 import '@esri/calcite-components/dist/components/calcite-segmented-control';
 import '@esri/calcite-components/dist/components/calcite-segmented-control-item';
+import '@esri/calcite-components/dist/components/calcite-select';
+import '@esri/calcite-components/dist/components/calcite-option';
+import { modelForOwner, ownerChoices, zoneBreakdown, type OwnerChoice } from './owner-pick';
 import '../../styles/review.css';
 import './dc-filters';
 import './dc-owner-list';
@@ -216,11 +219,14 @@ export class DcReview extends LitElement {
       if (this.member || !this.data) { this.dots = null; this.dotsT = null; this.stopDots(); }
       else if (!this.dots) this.drawDots();
       else this.laterDots();
-      if (this.filterOwner && !this.ev?.owners.some((o) => o.owner.username === this.filterOwner)) this.filterOwner = null;
+      // Any owner with a layer can be picked (not only those on the list); one who has none left is let go.
+      if (this.filterOwner && !this.data?.services.some((s) => s.owner === this.filterOwner)) this.filterOwner = null;
     }
   }
 
   protected override updated(changed: PropertyValues): void {
+    // The host keeps the By owner chart's highlight in step, whichever control picked the owner.
+    if (changed.has('filterOwner')) this.dispatchEvent(new CustomEvent<{ owner: string | null }>('dc-owner-filter-change', { detail: { owner: this.filterOwner }, bubbles: true, composed: true }));
     const host = this.querySelector('.chart-slot');
     const ctxHost = this.querySelector('.pagehead-ctx');
     const adopt = [...this.pending, ...this.querySelectorAll(':scope > [slot="chart"], :scope > [slot="context"]')];
@@ -380,9 +386,10 @@ export class DcReview extends LitElement {
       </calcite-segmented-control>
       <div class="chart-view" data-view="stale" ?hidden=${view !== 'stale'}>
         ${m ? this.chartSelection() : nothing}
-        ${m ? html`<dc-dot-map .model=${m} .org=${this.org} .thresholds=${this.dotsT ?? this.effective()} .lenses=${STALE_ONLY} .zoneLabel=${zoneName(shown)}
+        ${m ? html`<dc-dot-map .model=${this.chartModel(m)} .org=${this.org} .thresholds=${this.dotsT ?? this.effective()} .lenses=${STALE_ONLY} .zoneLabel=${zoneName(shown)}
           lenses-ready scale-switch height-scale="0.9" data-stale-services=${inZone} ?actions=${this.deleteStatus !== 'off'} ?selectable=${this.deleteStatus === 'ready'} .selected=${this.delSel}
           .deleteWhy=${this.deleteStatus === 'off' ? undefined : this.dotDeleteWhy} @dc-dots-select=${this.onDotsSelect} @dc-delete-pick=${this.onDeletePick}></dc-dot-map>` : nothing}
+        ${m ? this.zoneLine(this.chartModel(m)) : nothing}
       </div>
       <div class="chart-view chart-slot" data-view="owner" ?hidden=${view !== 'owner'}></div>
     </calcite-block>`;
@@ -428,9 +435,9 @@ export class DcReview extends LitElement {
     const everyone = ev.owners;
     const owners = this.visibleOwners();
     const member = this.member, personal = this.personal;
-    const filtered = !personal && this.filterOwner ? owners.filter((o) => o.owner.username === this.filterOwner) : owners;
+    const filtered = !member && this.filterOwner ? owners.filter((o) => o.owner.username === this.filterOwner) : owners;
     const rowsCount = owners.flatMap((o) => o.rows).length;
-    const fo = personal ? undefined : owners.find((o) => o.owner.username === this.filterOwner);
+    const fo = member || !this.filterOwner ? undefined : this.choices().find((c) => c.username === this.filterOwner);
     const heading = personal
       ? (rowsCount ? t('review.review.layersToReview', { count: sumSvc(owners.flatMap((o) => o.rows)) }) : t('review.review.nothing'))
       : (owners.length ? `${plural(filtered.length, 'owner', 'owners')} · ${plural(filtered.reduce((s, o) => s + sumSvc(o.rows), 0), 'service', 'services')}` : t('review.review.nothing'));
@@ -468,12 +475,14 @@ export class DcReview extends LitElement {
         </section>
         ${this.mode === 'admin-cant-send' ? html`<calcite-notice open icon="information" kind="brand"><div slot="message">${t('review.cantSend')}</div></calcite-notice>` : nothing}
         ${this.solo ? html`<calcite-notice open icon="information" kind="brand" data-note="solo"><div slot="message">${t('review.solo.note')}</div></calcite-notice>` : nothing}
+        ${member ? nothing : this.ownerPicker()}
         ${member ? nothing : this.chartCard(shown)}
         <div class="list-head"><h2>${heading}</h2>
-          ${fo ? html`<calcite-chip closable scale="m" appearance="outline-fill" kind="brand" @calciteChipClose=${() => { this.filterOwner = null; }}>${t('review.label.owner', { name: fo.owner.fullName })}</calcite-chip>` : nothing}</div>
+          ${fo ? html`<calcite-chip closable scale="m" appearance="outline-fill" kind="brand" @calciteChipClose=${() => { this.filterOwner = null; }}>${t('review.label.owner', { name: fo.name })}</calcite-chip>` : nothing}</div>
         ${everyone.length ? this.sortControl() : nothing}
         ${startNone ? html`<p class="lede">${t('review.sort.noneQuick')}</p>` : nothing}
         ${this.deleteBar(filtered)}
+        ${fo && !filtered.length ? html`<p class="lede owner-none" data-note="owner-none">${tn('review.owner.none', fo.total, { name: fo.name, count: formatNumber(fo.total) })}</p>` : nothing}
         ${list}
         ${member ? nothing : this.unreachable(ev)}
       </div>
@@ -583,6 +592,52 @@ export class DcReview extends LitElement {
       <calcite-button data-action="delete-selected" kind="danger" icon-start="trash" ?disabled=${n === 0}
         @click=${() => this.dispatchEvent(new CustomEvent('dc-delete-request', { detail: { ids: chosen }, bubbles: true, composed: true }))}>${t('review.delete.bulk')}</calcite-button>
     </div>`;
+  }
+
+  /** Every owner with a layer, for the picker (memoised per data and rule). */
+  private choicesMemo: { data: Data; ev: EvaluateResult | null; out: OwnerChoice[] } | null = null;
+  private choices(): OwnerChoice[] {
+    const m = this.choicesMemo, ev = this.ev ?? null;
+    if (m && m.data === this.data && m.ev === ev) return m.out;
+    return (this.choicesMemo = { data: this.data, ev, out: ownerChoices(this.data, ev) }).out;
+  }
+  /** The chart's dots: all of them, or only the picked owner's (every one of their layers, on the rule or not). */
+  private chartMemo: { src: DotModel; owner: string | null; out: DotModel } | null = null;
+  private chartModel(m: DotModel): DotModel {
+    const c = this.chartMemo, owner = this.member ? null : this.filterOwner;
+    if (c && c.src === m && c.owner === owner) return c.out;
+    return (this.chartMemo = { src: m, owner, out: modelForOwner(m, owner) }).out;
+  }
+  /** Pick one owner: the list and the chart then show only theirs. Every owner in the org, by name. */
+  private ownerPicker() {
+    const list = this.choices();
+    if (list.length < 2) return nothing;
+    const cur = this.filterOwner ?? '';
+    return html`<div class="owner-pick" data-owner-pick><calcite-label layout="inline" class="owner-pick-l">${t('review.owner.label')}
+      <calcite-select scale="s" data-action="owner-pick" label=${t('review.owner.label')}
+        @calciteSelectChange=${(e: Event) => { const v = (e.target as HTMLElement & { value: string }).value; this.filterOwner = v || null; }}>
+        <calcite-option value="" ?selected=${!cur}>${t('review.owner.all', { count: formatNumber(list.length) })}</calcite-option>
+        ${list.map((o) => html`<calcite-option value=${o.username} ?selected=${o.username === cur}>${o.name} · ${tn('review.owner.layers', o.total, { count: formatNumber(o.total) })}${o.listed ? ` · ${tn('review.owner.listed', o.listed, { count: formatNumber(o.listed) })}` : ''}</calcite-option>`)}
+      </calcite-select></calcite-label>
+      ${cur ? html`<span class="owner-pick-note" data-owner-note>${t('review.owner.chartNote')}</span>` : nothing}</div>`;
+  }
+  /** Under the chart: the zone is drawn from two parts of the rule, so say how many of its layers are on the list, and why not the rest. */
+  private zoneLine(m: DotModel) {
+    const tt = this.dotsT ?? this.effective();
+    const b = zoneBreakdown(m.dots, tt, this.depsKnown);
+    if (!m.revealed || b.zone === b.listed) return nothing;
+    const n = (k: number) => formatNumber(k);
+    const why = [
+      b.unknownUse ? tn('review.zone.unknown', b.unknownUse, { count: n(b.unknownUse) }) : '',
+      b.small ? tn('review.zone.small', b.small, { count: n(b.small), mb: formatNumber(tt.minSizeMB || 0) }) : '',
+      b.used ? (tt.maxUsedBy === 0 ? tn('review.zone.usedAny', b.used, { count: n(b.used) }) : tn('review.zone.used', b.used, { count: n(b.used), max: n(tt.maxUsedBy) })) : '',
+      b.other ? tn('review.zone.other', b.other, { count: n(b.other) }) : '',
+    ].filter(Boolean);
+    return html`<div class="zone-line" data-zone-line role="note">
+      <b>${tn('review.zone.head', b.zone, { count: n(b.zone), listed: n(b.listed) })}</b>
+      ${why.length ? html`<ul>${why.map((w) => html`<li>${w}</li>`)}</ul>` : nothing}
+      ${b.unknownUse ? html`<p class="zone-why">${t('review.zone.unknownWhy')}</p>` : nothing}
+      ${why.length > 1 ? html`<p class="zone-why">${t('review.zone.overlap')}</p>` : nothing}</div>`;
   }
 
   /** Words for the current rule, for the host's own use (for example a screen-reader summary). */

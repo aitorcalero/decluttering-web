@@ -40,6 +40,10 @@ export interface Dot {
   whyOf?: () => string;
   /** A view not yet linked to its source (before the core): it holds no storage of its own, so the size floor skips it. */
   view?: boolean;
+  /** The owner's username (Review's owner picker). Absent before the core. */
+  ownerId?: string;
+  /** False when last use can't be told under the rule (Row.useKnown); such a layer is never on the list. */
+  useKnown?: boolean;
 }
 
 export interface DotModel {
@@ -68,7 +72,7 @@ const dotOf = (r: Row, candidate: boolean, depsKnown: boolean): Dot => ({
   kind: r.stale ? 'stale' : 'fine', candidate,
   staleness: Math.min(1, Math.max(0, r.staleness)),
   usedBy: r.usedBy, lastUsedDaysAgo: r.lastUsedDaysAgo, daysSinceUpdate: r.daysSinceUpdate,
-  nSvc: 1 + r.views.length, why: '', view: r.source.isView || undefined,
+  nSvc: 1 + r.views.length, why: '', view: r.source.isView || undefined, ownerId: r.owner.username, useKnown: r.useKnown,
   whyOf: () => (r.stale && r.owner.disabled ? `${sayWhy(r, true, depsKnown)} · ${translate('scan.map.owner-disabled')}` : sayWhy(r, true, depsKnown)),
 });
 

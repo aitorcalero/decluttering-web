@@ -118,7 +118,7 @@ export const enScan = {
   'scan.map.legend.very': 'Very stale',
   'scan.map.legend.not-stale': 'Not stale',
   'scan.map.legend.storage-size': 'Bigger dot, more storage',
-  'scan.map.legend.used': 'Ring: used by maps or apps. Grey in the zone: too small, or in too many maps or apps',
+  'scan.map.legend.used': 'Ring: used by maps or apps. Grey in the zone: too small, in too many maps or apps, or last use unknown',
   'scan.map.legend.pending': 'Size not read yet',
   'scan.map.small-under': { one: '1 {layer} under {mb} MB ({credits} a month)', other: '{count} {layer} under {mb} MB ({credits} a month)' },
   'scan.map.small-layer-one': 'layer',

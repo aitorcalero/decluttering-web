@@ -65,6 +65,10 @@ flowchart TD
 
 On Review, the chart's **Vertical scale** switch offers **Log, in weeks**: most layers were used in the last few weeks, and on the standard scale they pile up near "today"; the log scale spreads them out (1, 2, 4, 13, 26, 52 and 104 weeks). The choice is remembered in your browser.
 
+**Pick one owner.** The **Owner** list above the chart has every owner in the org, not only those on the list. Picking one shows all of their layers on the chart, on the list or not (so you can select them with a rectangle), and only their card in the list.
+
+**Why the shaded zone holds more than the list.** The zone is drawn from two parts of the rule, last used and last updated; the list needs all of them. A line under the chart says how many layers are in the zone, how many of them are on the list, and why the rest are not: under the minimum size, used by too many maps or apps, or **last use unknown**. The last one is a layer with no recorded use: the scan reads one year of use and ArcGIS Online has no date for when it was last viewed, so with a rule of more than a year the app can't say it has gone unused that long, and leaves it off the list.
+
 You can see and change every number. Starting points fill them in:
 
 | Starting point | Last used | Last updated | Used by | Size |
@@ -254,6 +258,8 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`. `npm run
 - **Delete stale or large layers from Review**, off unless the build sets `VITE_DELETING=on`. Select layers by dragging a rectangle on the chart, from the list, or one at a time; confirm by typing a word. Never a permanent delete; each layer is checked again first. See [Deleting layers](#deleting-layers-off-by-default).
 - **A click on a chart dot asks** whether to view the item or delete it (Review only; the scan screen still opens the item).
 - **The header shows the version**, the commit and whether deleting is on.
+- **Pick any owner** on Review: the chart shows all of their layers and the list only theirs.
+- **The chart says why the shaded zone holds more layers than the list** (too small, too many maps or apps, last use unknown).
 - **Log scale in weeks** for the Review chart's vertical axis (last used), so recently used layers no longer pile up at the bottom.
 
 **1.3.0** (2 November 2026):

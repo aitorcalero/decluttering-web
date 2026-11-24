@@ -245,7 +245,7 @@ export class AppReview extends LitElement {
         <dc-review .data=${data} .org=${data.org} .deleteStatus=${this.deleteStatus} .canDelete=${this.deleting ? this.canDelete : undefined} @dc-delete-request=${this.onDeleteRequest} .countSweeps=${counting} .since=${this.since(data, counting)}
           @dc-count-sweeps=${(e: CustomEvent<boolean>) => setCountSweeps(data.org.id, e.detail)} .mode=${this.mode} .depsKnown=${this.depsKnown} .stopped=${this.stopped} .canSeeUsage=${this.canSeeUsage} .memberUsername=${this.username} .adminUsername=${this.mode === 'my-items' ? '' : this.username}
           @dc-thresholds-change=${(e: CustomEvent<Thresholds>) => { this.thresholds = e.detail; }}
-          @dc-owner-select=${this.onSelect} @dc-selection-change=${this.onSelection}>
+          @dc-owner-select=${this.onSelect} @dc-owner-filter-change=${(e: CustomEvent<{ owner: string | null }>) => { this.selected = e.detail.owner; }} @dc-selection-change=${this.onSelection}>
           ${this.mode === 'my-items' ? nothing : html`<dc-sankey slot="chart" .owners=${owners} .selected=${this.selected}></dc-sankey>`}
           <!-- DC-090: always rendered (dc-review moves it into its page head, so it must not come and go) -->
           <div slot="context" class="rescan-ctx">

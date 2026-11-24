@@ -475,3 +475,14 @@ dc-item-panel calcite-panel { height: 100%; box-shadow: -8px 0 24px rgb(0 0 0 / 
 .dd-unpick { position: absolute; inset-inline-end: 0; top: 0; padding: 0.15rem 0.5rem; font: inherit; font-size: 0.8125rem; cursor: pointer; border: 1px solid var(--calcite-color-border-1); border-radius: 3px; background: var(--calcite-color-foreground-1); color: var(--calcite-color-text-2); }
 .dd-unpick:hover, .dd-unpick:focus-visible { background: var(--calcite-color-foreground-2); outline: 2px solid var(--calcite-color-brand); outline-offset: 1px; }
 .chart-sel-note .dm-link { margin-inline-start: 0.35rem; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--calcite-color-text-link, #1b6ea8); text-decoration: underline; cursor: pointer; }
+
+/* Review: the owner picker, the note when the picked owner has nothing on the list, and the zone breakdown under the chart. */
+.owner-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin: 0.75rem 0 0.5rem; }
+.owner-pick-l { --calcite-label-margin-bottom: 0; font-weight: 600; }
+.owner-pick calcite-select { min-width: 18rem; max-width: 100%; }
+.owner-pick-note { font-size: 0.8125rem; color: var(--calcite-color-text-2); }
+.owner-none { margin: 0.5rem 0; }
+.zone-line { margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; border-inline-start: 3px solid var(--calcite-color-border-1); background: var(--calcite-color-foreground-2); font-size: 0.8125rem; color: var(--calcite-color-text-2); }
+.zone-line b { color: var(--calcite-color-text-1); }
+.zone-line ul { margin: 0.25rem 0 0; padding-inline-start: 1.1rem; }
+.zone-line .zone-why { margin: 0.35rem 0 0; }
