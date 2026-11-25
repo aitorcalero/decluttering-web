@@ -12,7 +12,7 @@ It runs entirely in your browser. There is no Decluttering server, and nothing g
 
 > **Try it without signing in:** open the site and choose **Try the demo**. It plays a full scan of a made-up council's org, then lets you review the results and write the emails. Nothing is sent and nothing leaves your browser.
 
-> **New, and built by one person.** Decluttering is version 1, so treat it as early days. Scanning and review only read your org. Emails go out only after you turn sending on and send yourself a test, and the app never moves or changes anyone's items. Deleting is off unless a build turns it on (see [Deleting layers](#deleting-layers-off-by-default)). It's provided as is (see [Disclaimer](#disclaimer)); please [raise an issue](https://github.com/simongis/decluttering-web/issues) if something looks off. Ideas, feedback and collaborators are very welcome (see [Contributing and support](#contributing-and-support)).
+> **New, and built by one person.** Decluttering is version 1, so treat it as early days. Scanning and review only read your org. Emails go out only after you turn sending on and send yourself a test, and the app never moves or changes anyone's items. Deleting is off unless a build turns it on (see [Deleting layers](#deleting-layers-off-by-default)). It's provided as is (see [Disclaimer](#disclaimer)); please [raise an issue](https://github.com/aitorcalero/decluttering-web/issues) if something looks off. Ideas, feedback and collaborators are very welcome (see [Contributing and support](#contributing-and-support)).
 
 ![Review: the rule on the left, the stale zone chart and the owners on the right](docs/images/review.png)
 
