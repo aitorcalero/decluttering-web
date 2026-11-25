@@ -267,6 +267,7 @@ Checks: `npm run typecheck && npm run lint && npm test && npm run e2e`. `npm run
 - **Log scale in weeks** for the Review chart's vertical axis (last used), so recently used layers no longer pile up at the bottom.
 - **Zoom on the Review chart:** a Select | Zoom switch, where a rectangle zooms in, with Back and Show all.
 - **Owner emails in Spanish** (and any future language): an **Email language** switch on the Emails step, starting from the app's language. The templates, the item list, dates, numbers and the footer all follow it.
+- **Hardening:** the app won't start inside another site's frame (clickjacking); the email template keeps only plain formatting (no scripts, images, styles or unsafe links, even if dropped in); the deploy pins its GitHub Actions to commits, checks the shipped packages with `npm audit`, and Dependabot proposes updates.
 - **Review says who gets an email:** a line above the owner cards explains the envelope tick boxes, and a card with nothing ticked says that owner won't get one.
 
 **1.3.0** (2 November 2026):

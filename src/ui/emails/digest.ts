@@ -100,6 +100,41 @@ export function fillSubject(subject: string, o: EmailOwner, ctx: Ctx): string {
     .trim();
 }
 
+/** Tags an email template may keep, with no attributes (links keep a checked href). Everything else is dropped. */
+const KEEP_TAGS = new Set(['p', 'div', 'br', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'a']);
+/** Tags dropped with everything inside them, not only the tag. */
+const DROP_WITH_CONTENT = /<(script|style|iframe|object|embed|template|noscript|textarea|select|svg|math|title|head)\b[\s\S]*?<\/\1\s*>/gi;
+const TAG = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+const safeHref = (raw: string): string | null => {
+  const h = raw.replace(/&amp;/g, '&').trim();
+  return /^(https?:\/\/|mailto:)[^\s"'<>`]+$/i.test(h) ? h : null;
+};
+
+/**
+ * The admin's template, reduced to plain formatting: paragraphs, line breaks, bold, italic, underline, lists and links to
+ * web or mail addresses. No other tag or attribute survives (no scripts, styles, images, frames, forms or event handlers),
+ * whatever was dropped or typed into the editor. Placeholders ({firstName}) are text, so they stay. Pure: no DOM.
+ */
+export function sanitizeTemplate(html: string): string {
+  const s = String(html ?? '').replace(/<!--[\s\S]*?-->/g, '').replace(DROP_WITH_CONTENT, '');
+  let out = '', last = 0;
+  for (const m of s.matchAll(TAG)) {
+    out += s.slice(last, m.index).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    last = m.index! + m[0].length;
+    const name = m[1]!.toLowerCase(), close = m[0].startsWith('</');
+    if (!KEEP_TAGS.has(name)) continue;
+    if (name === 'br') { out += '<br>'; continue; }
+    if (name === 'a' && !close) {
+      const href = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(m[2] ?? '');
+      const ok = href ? safeHref(href[1] ?? href[2] ?? href[3] ?? '') : null;
+      out += ok ? `<a href="${esc(ok)}">` : '<a>';
+      continue;
+    }
+    out += close ? `</${name}>` : `<${name}>`;
+  }
+  return out + s.slice(last).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /** Styles the admin's own paragraphs, lists and links (the item list is added after, with its own styles). */
 function styleAuthorHtml(tpl: string): string {
   const P = `margin:0 0 14px;font-family:${FONT};font-size:15px;line-height:1.55;color:${C.text};`;
@@ -113,7 +148,8 @@ function styleAuthorHtml(tpl: string): string {
 /** Fills the template for one owner. Values are escaped; the template itself is the admin's own HTML. */
 export function fillBody(tpl: string, o: EmailOwner, ctx: Ctx): string {
   const v = values(o, ctx);
-  let out = styleAuthorHtml(tpl);
+  // Sanitised again here, so whatever reaches the preview or ArcGIS Online is only plain formatting.
+  let out = styleAuthorHtml(sanitizeTemplate(tpl));
   // A paragraph holding only the item list becomes the list itself (tables can't sit inside a <p>).
   out = out.replace(/<p[^>]*>\s*\{itemList\}\s*(<br\s*\/?>)?\s*<\/p>/g, '{itemList}');
   out = out.replace(/\{(firstName|itemCount|credits|adminName)\}/g, (_m, k: keyof typeof v) =>

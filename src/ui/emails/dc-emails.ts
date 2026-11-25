@@ -33,7 +33,7 @@ import { getLogChoice, getNudgeLog, getNudgeSends, getOthersUnreadable, LOG_TITL
 import { othersUnreadableLine, renudgeLine } from '../../domain/cooldown';
 import { agoText, credit, plural } from '../shared/text';
 import {
-  buildDigest, chipsToTokens, emailHtml, esc, fillSubject, firstName, outsideLinks, phLabel, placeholders, tone as toneOf, TONE_KEYS, tokensToChips, totalCredits,
+  buildDigest, chipsToTokens, emailHtml, sanitizeTemplate, esc, fillSubject, firstName, outsideLinks, phLabel, placeholders, tone as toneOf, TONE_KEYS, tokensToChips, totalCredits,
   usedPlaceholders, type Admin, type EmailOrg, type EmailOwner, type PlaceholderKey, type ToneKey,
 } from './digest';
 import { nextSendStep, sendGate, type Gate, type SendStep } from './gate';
@@ -231,7 +231,7 @@ export class DcEmails extends LitElement {
     if (this.editor) this.editor.innerHTML = tokensToChips(tpl);
   }
   private readEditor = (): void => {
-    this.tpl = chipsToTokens(this.editor.innerHTML);
+    this.tpl = sanitizeTemplate(chipsToTokens(this.editor.innerHTML));
     draft.tpl = this.tpl; draft.dirty = true;
   };
   private remember = (): void => {
@@ -255,6 +255,16 @@ export class DcEmails extends LitElement {
   private onPaste = (e: ClipboardEvent): void => {
     e.preventDefault();
     document.execCommand('insertText', false, e.clipboardData?.getData('text/plain') ?? '');
+  };
+  /** Dropped content goes in as plain text too, like a paste: never markup from another page. */
+  private onDrop = (e: DragEvent): void => {
+    e.preventDefault();
+    const text = e.dataTransfer?.getData('text/plain') ?? '';
+    const doc = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null };
+    const at = doc.caretRangeFromPoint?.(e.clientX, e.clientY);
+    const s = getSelection();
+    if (at && s && this.editor.contains(at.startContainer)) { s.removeAllRanges(); s.addRange(at); }
+    if (text) document.execCommand('insertText', false, text);
   };
   private insertPlaceholder(k: PlaceholderKey): void {
     this.exec('insertHTML', `<span class="ph" contenteditable="false" data-ph="${k}" title="${esc(t('emails.placeholder.title'))}">${esc(phLabel(k))}</span>&nbsp;`);
@@ -682,7 +692,7 @@ export class DcEmails extends LitElement {
         <calcite-button scale="s" appearance="outline-fill" kind="neutral" label=${t('emails.bullets')} @click=${() => this.exec('insertUnorderedList')}>&bull; ${t('emails.editor.bullets.text')}</calcite-button>
       </div>
       <div class="em-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label=${t('emails.template.aria')} spellcheck="true"
-        @input=${this.readEditor} @paste=${this.onPaste} @keyup=${this.remember} @mouseup=${this.remember} @focusout=${this.remember}></div>
+        @input=${this.readEditor} @paste=${this.onPaste} @drop=${this.onDrop} @keyup=${this.remember} @mouseup=${this.remember} @focusout=${this.remember}></div>
       <div class="em-chips" @mousedown=${(e: Event) => e.preventDefault()}><span class="muted small">${t('emails.placeholder.add')}</span>
         ${placeholders().map(([k, l]) => html`<calcite-button data-ph=${k} scale="s" appearance="outline" kind="brand" icon-start="plus" @click=${() => this.insertPlaceholder(k)}>${l}</calcite-button>`)}
       </div>

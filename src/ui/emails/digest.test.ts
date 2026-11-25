@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { buildDigest, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, FOOTER_SITE, SITE_URL, tone, TONE_KEYS, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow, type ToneKey } from './digest';
+import { buildDigest, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, sanitizeTemplate, FOOTER_SITE, SITE_URL, tone, TONE_KEYS, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow, type ToneKey } from './digest';
 import { ensureLocale, withLocale } from '../../i18n';
 
 const TONES = Object.fromEntries(TONE_KEYS.map((k) => [k, tone(k)])) as Record<ToneKey, ReturnType<typeof tone>>;
@@ -155,5 +155,37 @@ describe('owner emails in Spanish (the email language, not the app language)', (
   it('leaves the app language alone', () => {
     es(() => tone('brief'));
     expect(tone('brief').subject).toBe('ArcGIS Online: {itemCount} items to check');
+  });
+});
+
+describe('the template keeps only plain formatting (hardening)', () => {
+  it('keeps the starting templates as they are', () => {
+    for (const k of TONE_KEYS) expect(sanitizeTemplate(TONES[k].html)).toBe(TONES[k].html);
+  });
+
+  it('drops scripts, styles, frames, images, forms and every attribute', () => {
+    const bad = '<p onclick="x()" style="color:red">Hi <img src=x onerror=alert(1)><script>alert(1)</script><style>p{}</style>'
+      + '<iframe src="https://evil.example"></iframe><form action="https://evil.example"><input name=a></form><svg><script>1</script></svg>there</p><!-- c -->';
+    const out = sanitizeTemplate(bad);
+    expect(out).toBe('<p>Hi there</p>');
+  });
+
+  it('keeps links only to web and mail addresses, without other attributes', () => {
+    expect(sanitizeTemplate('<a href="https://org.maps.arcgis.com/home" target="_blank" onmouseover="x">ok</a>')).toBe('<a href="https://org.maps.arcgis.com/home">ok</a>');
+    expect(sanitizeTemplate('<a href="mailto:me@example.org">me</a>')).toBe('<a href="mailto:me@example.org">me</a>');
+    for (const h of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,<b>x</b>', 'vbscript:x', '//evil.example', ' java\tscript:x']) {
+      expect(sanitizeTemplate(`<a href="${h}">x</a>`)).toBe('<a>x</a>');
+    }
+  });
+
+  it('turns stray angle brackets into text and keeps placeholders', () => {
+    expect(sanitizeTemplate('<p>1 < 2 > 0 {firstName}</p>')).toBe('<p>1 &lt; 2 &gt; 0 {firstName}</p>');
+    expect(sanitizeTemplate('<div>a</div><br/><ul><li>b</li></ul>')).toBe('<div>a</div><br><ul><li>b</li></ul>');
+  });
+
+  it('the email itself never carries what the sanitiser drops', () => {
+    const html = emailHtml('<p onclick="x">Hi {firstName}<img src="https://evil.example/t.gif"></p><p>{itemList}</p>', owner([row('a', 'look')]), ctx);
+    expect(html).not.toMatch(/onclick|<img|evil\.example/);
+    expect(html).toContain('Hi Jo');
   });
 });
