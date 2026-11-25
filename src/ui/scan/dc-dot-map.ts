@@ -1,7 +1,7 @@
 import { LitElement, html, nothing, render, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { LocaleController } from '../../i18n/controller';
-import { t as translate, tn } from '../../i18n';
+import { formatNumber, t as translate, tn } from '../../i18n';
 import { live } from 'lit/directives/live.js';
 import '@esri/calcite-components/dist/components/calcite-segmented-control';
 import '@esri/calcite-components/dist/components/calcite-segmented-control-item';
@@ -18,6 +18,7 @@ import {
 } from './dot-layout';
 import { chartPalette, type ChartPalette } from './chart-palette';
 import { idsInRect, isDrag, normalise, type DragRect } from './dot-select';
+import { FULL, dayUnit, inView, isFull, lerpView, ticksIn, toPx, viewFromRect, type View } from './dot-zoom';
 import { onSkinChange } from '../skin/skin';
 
 /*
@@ -46,6 +47,13 @@ const writeShowSmall = (v: boolean): void => { try { localStorage.setItem(SHOW_S
 const INSET = 16;
 /** ADR 0016: the ring on dots chosen for deleting, and the drag rectangle. Calcite's danger red reads on both looks. */
 const PICK_COLOUR = '#d83020';
+/** The zoom rectangle: Calcite's brand blue, so it never reads as the delete selection. */
+const ZOOM_COLOUR = '#007ac2';
+const ZOOM_MS = 260;
+/** Zoomed ticks: days across (last updated) and up (last used, standard scale), and weeks up on the log scale. */
+const X_DAYS = [7, 14, 30, 60, 90, 120, 150, 180, 240, 270, 365, 450, 545, 640, 730, 900];
+const Y_DAYS = [0, 3, 7, 14, 30, 45, 60, 90, 120, 150, 180, 240, 270, 365, 450, 545, 730, 1095];
+const Y_WEEKS = [1, 2, 3, 4, 6, 8, 13, 17, 26, 39, 52, 78, 104, 156];
 
 interface Sprite extends Dot {
   /** Index in `sprites` (hit test, keyboard). */
@@ -94,6 +102,57 @@ export class DcDotMap extends LitElement {
   @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
   /** ADR 0016: why a dot can't be deleted ('' when it can). Absent: the dot's menu has no Delete. */
   @property({ attribute: false }) deleteWhy: ((id: string) => string) | undefined;
+  /** Review: offer the Select | Zoom switch on How stale. With it, a rectangle in Zoom becomes the view. */
+  @property({ type: Boolean }) zoomable = false;
+  /** What a drag does. Without `selectable` it always zooms. */
+  @state() private tool: 'select' | 'zoom' = 'select';
+  /** The view the zoom is going to (null: the whole plot), and the ones before it, for Back. */
+  @state() private zoom: View | null = null;
+  private zoomStack: (View | null)[] = [];
+  private zoomAnim: { from: View; to: View; start: number; dur: number } | null = null;
+  /** The view drawn this frame (the tween's, while it runs). */
+  private cv: View = FULL;
+  private get canZoom(): boolean { return this.zoomable && this.lens === 'stale' && this.shown.revealed; }
+  private get dragTool(): 'select' | 'zoom' | null {
+    if (this.canZoom && (this.tool === 'zoom' || !this.selectable)) return 'zoom';
+    return this.selectable ? 'select' : null;
+  }
+  private viewAt(now: number): View {
+    const a = this.zoomAnim, to = this.zoom ?? FULL;
+    if (!a) return to;
+    const k = Math.min(1, Math.max(0, (now - a.start) / a.dur));
+    if (k >= 1) { this.zoomAnim = null; return to; }
+    return lerpView(a.from, a.to, 1 - (1 - k) * (1 - k));
+  }
+  private setZoom(v: View | null, push = true): void {
+    const next = v && isFull(v) ? null : v;
+    if (push) this.zoomStack.push(this.zoom);
+    const now = performance.now();
+    this.zoomAnim = this.reduce ? null : { from: this.viewAt(now), to: next ?? FULL, start: now, dur: ZOOM_MS };
+    this.zoom = next;
+    if (!next) this.zoomStack = [];
+    this.hover = null; this.focusIdx = -1; this.hideTip();
+    if (this.zoomAnim) this.bump(now + ZOOM_MS);
+    const n = next ? this.visibleCount(next) : 0;
+    if (this.srLive) this.srLive.textContent = next ? tn('scan.map.zoom.done', n, { count: fmtInt(n) }) : translate('scan.map.zoom.all');
+    this.kick();
+  }
+  private zoomBack = (): void => { if (!this.zoomStack.length) return; this.setZoom(this.zoomStack.pop() ?? null, false); };
+  private zoomReset = (): void => { this.zoomStack = []; this.setZoom(null, false); };
+  /** Layers drawn in the view (where they are going): the same test as paint, so a dot cut by the edge counts too. */
+  private visibleCount(v: View): number {
+    if (!this.W) { let n = 0; for (const s of this.sprites) if (!s.view && s.mo && inView(v, s.mo.tx, s.mo.ty)) n++; return n; }
+    const p = this.plot(), a = this.area();
+    let n = 0;
+    for (const s of this.sprites) {
+      if (s.view || !s.mo) continue;
+      const [x, y] = toPx(a, v, s.mo.tx, s.mo.ty), r = s.mo.tr;
+      if (x >= p.x0 - r && x <= p.x0 + p.w + r && y >= p.y0 - r && y <= p.y0 + p.h + r) n++;
+    }
+    return n;
+  }
+  /** The drawing area in px (where fractions 0 and 1 land). */
+  private area() { const p = this.plot(); return { gx: p.x0 + INSET, gy: p.y0 + INSET, gw: p.w - 2 * INSET, gh: p.h - 2 * INSET }; }
   /** The rectangle being drawn (px in the canvas), and whether the press has moved far enough to be a drag. */
   private drag: (DragRect & { pointer: number }) | null = null;
   private dragging = false;
@@ -112,6 +171,7 @@ export class DcDotMap extends LitElement {
   private setYScale(v: YScale): void {
     if (v === this.yPick) return;
     this.yPick = v; writeYScale(v); this.hideTip();
+    if (this.zoom) this.zoomReset(); // the same fractions are other dates on the other scale
     this.rebuild(true); this.kick();
   }
   private floorMemo: { model: DotModel; show: boolean; lens: LensId; expected: number; out: { model: DotModel; hidden: HiddenSmall } } | null = null;
@@ -209,8 +269,10 @@ export class DcDotMap extends LitElement {
 
   // ---------- layout ----------
   private plot() { const { l, r, t, b } = this.pad; return { x0: l, y0: t, w: this.W - l - r, h: this.H - t - b }; }
-  private plotX(n: number) { const p = this.plot(); return p.x0 + INSET + n * (p.w - 2 * INSET); }
-  private plotY(n: number) { const p = this.plot(); return p.y0 + INSET + (1 - n) * (p.h - 2 * INSET); }
+  // Through the view drawn this frame: the whole plot unless zoomed.
+  private plotX(n: number) { const p = this.plot(), v = this.cv; return p.x0 + INSET + (n - v.x0) / (v.x1 - v.x0) * (p.w - 2 * INSET); }
+  private plotY(n: number) { const p = this.plot(), v = this.cv; return p.y0 + INSET + (1 - (n - v.y0) / (v.y1 - v.y0)) * (p.h - 2 * INSET); }
+  private zoomed(): boolean { return !isFull(this.cv); }
   /** How many dots the plot is sized for: before usage, everything the search found, so it does not grow as pages land. */
   private layoutCount(): number { return this.shown.revealed ? this.sprites.length : Math.max(this.sprites.length, this.expected); }
   private targetH(): number { return Math.round(mapHeight(this.W || 600, this.layoutCount(), innerHeight) * this.heightScale); }
@@ -323,6 +385,7 @@ export class DcDotMap extends LitElement {
   private setLens(id: LensId): void {
     if (id === this.picked) return;
     this.picked = id;
+    if (this.zoom) this.zoomReset();
     this.hideTip();
     if (this.reduce) {
       // Cross-fade: fade the plot out, swap the lens at the midpoint (no travel), fade back in.
@@ -370,13 +433,25 @@ export class DcDotMap extends LitElement {
       if (P.starChart) ctx.setLineDash([1, 4]);
       ctx.stroke(); ctx.setLineDash([]);
     };
-    const xt = (n: number, label: string) => { ctx.fillStyle = P.text; ctx.textAlign = 'center'; ctx.fillText(cap(label), this.plotX(n), bottom + 16); };
+    const zoomed = this.zoomed(), v = this.cv;
+    const xIn = (n: number) => !zoomed || (n >= v.x0 && n <= v.x1), yIn = (n: number) => !zoomed || (n >= v.y0 && n <= v.y1);
+    const xt = (n: number, label: string) => { if (!xIn(n)) return; ctx.fillStyle = P.text; ctx.textAlign = 'center'; ctx.fillText(cap(label), this.plotX(n), bottom + 16); };
     const yt = (n: number, label: string, grid = true) => {
+      if (!yIn(n)) return;
       const y = this.plotY(n); ctx.fillStyle = P.text; ctx.textAlign = 'right'; ctx.fillText(cap(label), p.x0 - 6, y + 4);
       if (grid) gridLine(p.x0, Math.round(y) + 0.5, right, Math.round(y) + 0.5);
     };
-    const vline = (n: number) => { const x = Math.round(this.plotX(n)) + 0.5; gridLine(x, p.y0, x, bottom); };
+    const vline = (n: number) => { if (!xIn(n)) return; const x = Math.round(this.plotX(n)) + 0.5; gridLine(x, p.y0, x, bottom); };
+    const dayWords = (d: number): string => {
+      const u = dayUnit(d);
+      return u.unit === 'today' ? translate('scan.map.today') : tn(`scan.map.axis.${u.unit}`, u.n, { count: formatNumber(u.n) });
+    };
     const timeAxis = () => {
+      if (zoomed && this.lens === 'stale') {
+        for (const d of ticksIn(X_DAYS, (x) => xUpdate(x, 0), v.x0, v.x1, p.w, 64)) { vline(xUpdate(d, 0)); xt(xUpdate(d, 0), dayWords(d)); }
+        if (xIn(0.95)) { vline(0.89); xt(0.95, translate('scan.map.years-3-plus')); }
+        return;
+      }
       for (const [d, l] of [[90, translate('scan.map.months-3')], [180, translate('scan.map.months-6')], [365, translate('scan.map.years-1')], [730, translate('scan.map.years-2')]] as const) { vline(xUpdate(d, 0)); xt(xUpdate(d, 0), l); }
       vline(0.89); xt(0.95, translate('scan.map.years-3-plus'));
     };
@@ -406,24 +481,37 @@ export class DcDotMap extends LitElement {
     let xTitle: string, yTitle: string;
     if (this.lens === 'stale') {
       const ys = this.yScale, z = staleZone(t, ys);
-      const zx = this.plotX(z.x) - 0.5, zy = this.plotY(z.y), zyTop = p.y0 + 2, zr = right - 2;
-      ctx.fillStyle = P.zoneFill; ctx.fillRect(zx, zyTop, zr - zx, zy - zyTop);
+      // Zoomed, the zone runs past the view: its far edges are the plot's, and it is cut to the plot.
+      const zxRaw = this.plotX(z.x) - 0.5, zx = zoomed ? Math.max(p.x0, zxRaw) : zxRaw;
+      const zy = zoomed ? Math.min(bottom, this.plotY(z.y)) : this.plotY(z.y), zyTop = p.y0 + 2, zr = right - 2;
+      const zoneShows = !zoomed || (zx < zr && zy > zyTop);
+      if (zoneShows) { ctx.fillStyle = P.zoneFill; ctx.fillRect(zx, zyTop, zr - zx, zy - zyTop); }
       const sy = Math.round(this.plotY(0.893)) + 0.5; // separator under the "No use" band (no use recorded)
-      ctx.beginPath(); ctx.moveTo(p.x0, sy); ctx.lineTo(right, sy); ctx.strokeStyle = P.sep; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
+      if (yIn(0.893)) { ctx.beginPath(); ctx.moveTo(p.x0, sy); ctx.lineTo(right, sy); ctx.strokeStyle = P.sep; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); }
       ctx.globalAlpha = this.preTimed ? 1 : k; timeAxis(); ctx.globalAlpha = k; // the time axis was already there
       yt((Y_BAND[0] + Y_BAND[1]) / 2, translate('scan.map.no-use'), false);
-      const ticks: [number, string][] = ys === 'log-weeks'
+      const ticks: [number, string][] = zoomed
+        ? (ys === 'log-weeks'
+          ? ticksIn([0, ...Y_WEEKS.map((w) => w * 7)], (d) => yLastUsed(d, ys), v.y0, v.y1, p.h, 18).map((d): [number, string] => [d, d ? fmtInt(d / 7) : translate('scan.map.today')])
+          : ticksIn(Y_DAYS, (d) => yLastUsed(d, ys), v.y0, v.y1, p.h, 18).map((d): [number, string] => [d, dayWords(d)]))
+        : ys === 'log-weeks'
         ? [[0, translate('scan.map.today')], ...LOG_WEEK_TICKS.map(([d, w]): [number, string] => [d, fmtInt(w)])] // the unit is in the axis title: long labels don't fit the margin
         : [[0, translate('scan.map.today')], [90, translate('scan.map.months-3')], [180, translate('scan.map.months-6')], [365, translate('scan.map.years-1')], [730, translate('scan.map.years-2')]];
       for (const [d, l] of ticks) yt(yLastUsed(d, ys), l);
       xTitle = translate('scan.map.last-updated'); yTitle = translate(ys === 'log-weeks' ? 'scan.map.last-used-log' : 'scan.map.last-used');
       // FB-63: the border goes on after the grid lines. A grid line (1 year, 6 months...) can sit on the zone's edge, and painted first
       // the border was wiped out by it (Gentle and Suggested put the left edge exactly on "1 year").
-      const zb = zoneBox(p, INSET, t, ys);
-      ctx.save(); ctx.strokeStyle = P.zoneLine; ctx.setLineDash(P.starChart ? [6, 3] : [4, 3]); ctx.strokeRect(zb.left, zb.top, zb.right - zb.left, zb.bottom - zb.top); ctx.restore();
+      const zb = zoomed
+        ? { left: Math.round(zxRaw) + 0.5, right: v.x1 >= 1 ? right - 2 : right + 4, top: v.y1 >= 1 ? p.y0 + 2.5 : p.y0 - 4, bottom: Math.round(this.plotY(z.y)) + 0.5 }
+        : zoneBox(p, INSET, t, ys);
+      if (zoneShows) {
+        ctx.save();
+        if (zoomed) { ctx.beginPath(); ctx.rect(p.x0, p.y0, p.w, p.h); ctx.clip(); }
+        ctx.strokeStyle = P.zoneLine; ctx.setLineDash(P.starChart ? [6, 3] : [4, 3]); ctx.strokeRect(zb.left, zb.top, zb.right - zb.left, zb.bottom - zb.top); ctx.restore();
+      }
       ctx.globalAlpha = k * 0.95;
       // FB-41: no corner labels; the axis titles and the stale zone say it.
-      this.halo(cap(translate('scan.map.stale-zone', { label: this.zoneLabel })), zx + 8, zyTop + 14, 'left', P.zoneLine, P.starChart ? `600 12.5px ${P.font}` : `600 11.5px ${P.font}`);
+      if (zoneShows) this.halo(cap(translate('scan.map.stale-zone', { label: this.zoneLabel })), zx + 8, zyTop + 14, 'left', P.zoneLine, P.starChart ? `600 12.5px ${P.font}` : `600 11.5px ${P.font}`);
       ctx.globalAlpha = k;
     } else if (this.lens === 'big') {
       const max = this.shown.maxSizeMB;
@@ -461,17 +549,29 @@ export class DcDotMap extends LitElement {
   private paint(now: number): void {
     const ctx = this.ctx; if (!ctx || !this.W) return;
     ctx.clearRect(0, 0, this.W, this.H);
+    this.cv = this.canZoom ? this.viewAt(now) : FULL;
+    if (this.zoomAnim) this.bump(this.zoomAnim.start + this.zoomAnim.dur);
     this.drawAxes();
     const revealed = this.shown.revealed, reduce = this.reduce;
     const p = this.plot(), gx = p.x0 + INSET, gw = p.w - 2 * INSET, gy = p.y0 + INSET, gh = p.h - 2 * INSET;
+    const v = this.cv, zoomed = this.zoomed(), vw = v.x1 - v.x0, vh = v.y1 - v.y0;
+    if (zoomed) { ctx.save(); ctx.beginPath(); ctx.rect(p.x0, p.y0, p.w, p.h); ctx.clip(); }
     const xMax = p.x0 + p.w, yMax = p.y0 + p.h, enterMs = reduce ? FADE_MS : ENTER_MS;
     const denseK = tweenAt(this.denseT, now);
     const shadePts: [number, number][] = [];
     for (const i of this.order) {
       const d = this.sprites[i] as Sprite;
       const [nx, ny, r0] = motionAt(d.mo, now);
-      const x = clamp(gx + nx * gw, p.x0 + r0, xMax - r0), y = clamp(gy + (1 - ny) * gh, p.y0 + r0, yMax - r0);
-      d.x = x; d.y = y;
+      let x: number, y: number;
+      if (zoomed) {
+        // Outside the view: not drawn, so neither hovered, picked nor stepped to.
+        x = gx + (nx - v.x0) / vw * gw; y = gy + (1 - (ny - v.y0) / vh) * gh;
+        d.x = x; d.y = y;
+        if (x < p.x0 - r0 || x > xMax + r0 || y < p.y0 - r0 || y > yMax + r0) { d.rad = 0; continue; }
+      } else {
+        x = clamp(gx + nx * gw, p.x0 + r0, xMax - r0); y = clamp(gy + (1 - ny) * gh, p.y0 + r0, yMax - r0);
+        d.x = x; d.y = y;
+      }
       if (d.shade) { shadePts.push([x, y]); d.rad = 0; if (denseK >= 0.99) continue; }
       let alpha = d.candidate && revealed ? 0.88 : 0.7, r = r0;
       if (now < d.born + enterMs) {
@@ -514,10 +614,11 @@ export class DcDotMap extends LitElement {
         ctx.beginPath(); ctx.arc(d.x, d.y, (d.rad || 2.5) + 2.5, 0, 7); ctx.stroke();
       }
     }
+    if (zoomed) ctx.restore();
     if (this.dragging && this.drag) {
-      const r = normalise(this.drag);
-      ctx.fillStyle = PICK_COLOUR; ctx.globalAlpha = 0.1; ctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
-      ctx.globalAlpha = 1; ctx.strokeStyle = PICK_COLOUR; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+      const r = normalise(this.drag), col = this.dragTool === 'zoom' ? ZOOM_COLOUR : PICK_COLOUR;
+      ctx.fillStyle = col; ctx.globalAlpha = 0.1; ctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+      ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
       ctx.strokeRect(r.x0 + 0.5, r.y0 + 0.5, r.x1 - r.x0, r.y1 - r.y0); ctx.setLineDash([]);
     }
   }
@@ -611,6 +712,7 @@ export class DcDotMap extends LitElement {
     this.drag = null; this.dragging = false;
     if (!d || !was || e.pointerId !== d.pointer) return;
     this.eatClick = true; setTimeout(() => { this.eatClick = false; }, 0);
+    if (this.dragTool === 'zoom') { this.setZoom(viewFromRect(this.area(), this.cv, d)); return; }
     // A shaded dot is a cell of the shading: about 3 px across.
     const ids = idsInRect(this.sprites.map((s) => ({ id: s.id, x: s.x, y: s.y, drawn: s.rad > 0 || !!s.shade, view: s.view, r: s.rad || (s.shade ? 1.5 : 0) })), d);
     const hidden = this.hiddenInRect(d);
@@ -634,6 +736,20 @@ export class DcDotMap extends LitElement {
     return idsInRect(pts, rect);
   }
   private onCancel = (): void => { this.drag = null; this.dragging = false; this.kick(); };
+  /** Select | Zoom, Back and Show all, and how many layers the zoomed view holds. */
+  private zoomBar() {
+    const z = this.zoom, n = z ? this.visibleCount(z) : 0;
+    return html`<div class="dm-zoom" data-scan="zoom-bar">
+      ${this.selectable ? html`<calcite-segmented-control scale="s" width="auto" data-scan="tool" label=${translate('scan.map.tool.label')}
+        @calciteSegmentedControlChange=${(e: Event) => { this.tool = (e.target as HTMLElement & { value: string }).value === 'zoom' ? 'zoom' : 'select'; this.hideTip(); }}>
+        <calcite-segmented-control-item value="select" icon-start="cursor-marquee" .checked=${live(this.tool === 'select')}>${translate('scan.map.tool.select')}</calcite-segmented-control-item>
+        <calcite-segmented-control-item value="zoom" icon-start="zoom-in-magnifying-glass" .checked=${live(this.tool === 'zoom')}>${translate('scan.map.tool.zoom')}</calcite-segmented-control-item>
+      </calcite-segmented-control>` : nothing}
+      <calcite-button scale="s" appearance="outline" kind="neutral" icon-start="undo" data-action="zoom-back" ?disabled=${!this.zoomStack.length} @click=${this.zoomBack}>${translate('scan.map.zoom.back')}</calcite-button>
+      <calcite-button scale="s" appearance="outline" kind="neutral" icon-start="zoom-out-fixed" data-action="zoom-reset" ?disabled=${!z} @click=${this.zoomReset}>${translate('scan.map.zoom.reset')}</calcite-button>
+      <span class="dm-zoom-note" data-zoom-count role="status">${z ? tn('scan.map.zoom.count', n, { count: fmtInt(n) }) : ''}</span>
+    </div>`;
+  }
   private creditsText(c: number): string { return c >= 0.05 ? translate('scan.map.credits', { credits: c < 10 ? c.toFixed(1) : fmtInt(c) }) : translate('scan.map.under-credits'); }
   private hideTip(): void { clearTimeout(this.tipTimer); clearTimeout(this.hideTimer); if (this.tip) this.tip.hidden = true; this.pinned = false; this.menuOpen = false; }
   private scheduleHide(): void {
@@ -655,7 +771,7 @@ export class DcDotMap extends LitElement {
     }
     if (this.actions && this.pinned) return; // the dot's menu stays put while the pointer travels to it
     const i = this.at(e);
-    this.canvas.style.cursor = i != null ? 'pointer' : this.selectable ? 'crosshair' : 'default';
+    this.canvas.style.cursor = i != null ? 'pointer' : this.dragTool === 'zoom' ? 'zoom-in' : this.dragTool === 'select' ? 'crosshair' : 'default';
     if (i === this.hover) return;
     clearTimeout(this.tipTimer);
     this.hover = i; this.focusIdx = -1; this.pinned = false; this.kick();
@@ -667,7 +783,7 @@ export class DcDotMap extends LitElement {
   private onDown = (e: PointerEvent): void => {
     this.touch = e.pointerType !== 'mouse';
     // ADR 0016: a mouse or pen press may start a rectangle; a finger scrolls the page instead.
-    if (!this.selectable || e.pointerType === 'touch' || e.button !== 0) return;
+    if (!this.dragTool || e.pointerType === 'touch' || e.button !== 0) return;
     const pt = this.canvasPoint(e);
     this.drag = { x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y, pointer: e.pointerId }; this.dragging = false;
   };
@@ -732,6 +848,7 @@ export class DcDotMap extends LitElement {
               ${Y_SCALES.map((s) => html`<calcite-segmented-control-item value=${s} .checked=${live(s === this.yPick)}>${translate(s === 'log-weeks' ? 'scan.map.scale.log' : 'scan.map.scale.standard')}</calcite-segmented-control-item>`)}
             </calcite-segmented-control></span>` : nothing}
         </div>
+        ${this.zoomable && this.lens === 'stale' && ready ? this.zoomBar() : nothing}
         <div class="dm-stage">
           <canvas tabindex="0" role="application" aria-roledescription=${translate('scan.map.canvas-title')} aria-describedby="dc-dm-help dc-dm-tip" data-scan="dots"
             aria-label=${translate('scan.map.aria', { dense: dense ? translate('scan.map.aria.density') : '', hidden: hiddenNote && !this.showSmall ? translate('scan.map.aria.hidden', { label: hiddenNote }) : '' })}
@@ -741,7 +858,9 @@ export class DcDotMap extends LitElement {
           <div class="dm-sr" aria-live="polite"></div>
           <p class="dm-sr" id="dc-dm-help" data-scan="dots-help">${ready ? tn('scan.map.help.ready', m.dots.length, { count: fmtInt(m.dots.length), stale: fmtInt(m.dots.filter((d) => d.kind === 'stale').length) }) : translate('scan.map.help.waiting')}${translate(this.actions ? 'scan.map.help.keys-actions' : 'scan.map.help.keys')}</p>
         </div>
-        ${this.selectable ? html`<p class="dm-select-hint" data-scan="select-hint"><b>${translate('scan.map.select.hintLead')}</b> ${translate('scan.map.select.hint')}</p>` : nothing}
+        ${this.dragTool === 'zoom'
+          ? html`<p class="dm-select-hint dm-zoom-hint" data-scan="zoom-hint"><b>${translate('scan.map.zoom.hintLead')}</b> ${translate('scan.map.zoom.hint')}</p>`
+          : this.selectable ? html`<p class="dm-select-hint" data-scan="select-hint"><b>${translate('scan.map.select.hintLead')}</b> ${translate('scan.map.select.hint')}</p>` : nothing}
         <div class="dm-legend">
           <span class="dm-lg"><span class="dm-ramp" style="background: linear-gradient(90deg, ${this.pal.ramp.from}, ${this.pal.ramp.mid}, ${this.pal.ramp.to})"></span><span class="dm-ramp-labels"><span>${translate('scan.map.legend.barely')}</span><span>${translate('scan.map.legend.very')}</span></span></span>
           ${dense

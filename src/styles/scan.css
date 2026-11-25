@@ -135,3 +135,8 @@ calcite-segmented-control[disabled] + .dm-lens-note { font-style: italic; }
 /* The vertical scale switch on Review's "How stale" chart. */
 .dm-scale { display: inline-flex; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 .dm-scale-l { font-size: 0.8125rem; color: var(--calcite-color-text-2); white-space: nowrap; }
+
+/* Review's chart zoom: Select | Zoom, Back, Show all, and how many layers the view holds. */
+.dm-zoom { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; margin: 0.4rem 0; }
+.dm-zoom-note { font-size: 0.8125rem; color: var(--calcite-color-text-2); }
+.dm-zoom-hint { border-inline-start-color: #007ac2; }
