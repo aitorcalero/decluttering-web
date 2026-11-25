@@ -2,7 +2,9 @@
 
 **Tidy up your ArcGIS Online content, gently.**
 
-### [**Open the app →**](https://simongis.github.io/decluttering-web/)
+### [**Open the app →**](https://aitorcalero.github.io/decluttering-web/)
+
+> This is Aitor Calero's fork of [simongis/decluttering-web](https://github.com/simongis/decluttering-web). The site above can **delete layers** (`VITE_DELETING=on`): each delete is confirmed by typing a word and goes to the recycle bin where the org has one. The original app is at https://simongis.github.io/decluttering-web/.
 
 Decluttering finds the hosted feature layers in your org that nobody seems to use, shows you why each one was picked out and what it costs in credits, and helps you send each owner **one friendly email** about them. Owners decide what happens to their own layers. The app **never moves or changes anyone's items**, and it **only deletes** when a build has deleting turned on (it is off unless `VITE_DELETING=on`) and you confirm each delete yourself (see [Deleting layers](#deleting-layers-off-by-default)).
 
