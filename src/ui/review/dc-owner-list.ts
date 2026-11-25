@@ -212,7 +212,8 @@ export class DcOwnerList extends LitElement {
       ${this.selectable ? html`<div class="owner-foot">
         <calcite-label layout="inline"><calcite-checkbox .checked=${on === o.rows.length} .indeterminate=${on > 0 && on < o.rows.length}
           label=${t('review.owner.includeDigest', { name: first })}
-          @calciteCheckboxChange=${(e: Event) => this.dispatchEvent(new CustomEvent('dc-owner-toggle', { detail: { username: u, checked: (e.target as HTMLInputElement).checked }, bubbles: true, composed: true }))}></calcite-checkbox>${t('review.owner.includeDigest', { name: first })}${on === o.rows.length ? nothing : html`<span class="count"> (${t('review.owner.itemCount', { included: on, total: o.rows.length })})</span>`}</calcite-label>
+          @calciteCheckboxChange=${(e: Event) => this.dispatchEvent(new CustomEvent('dc-owner-toggle', { detail: { username: u, checked: (e.target as HTMLInputElement).checked }, bubbles: true, composed: true }))}></calcite-checkbox><calcite-icon icon="envelope" scale="s" aria-hidden="true"></calcite-icon>${t('review.owner.includeDigest', { name: first })}<span class="count"> (${t('review.owner.itemCount', { included: on, total: o.rows.length })})</span></calcite-label>
+        ${on === 0 && !o.nudgedRecently ? html`<p class="why-tick" data-review="no-mail">${t('review.owner.noMail', { name: first })}</p>` : nothing}
         ${o.nudgedRecently ? html`<p class="why-tick">${t('review.owner.leftUnticked', { name: first, months: sixMonths })}</p>` : nothing}
       </div>` : nothing}
     </section>`;
@@ -232,7 +233,10 @@ export class DcOwnerList extends LitElement {
   override render() {
     if (this.member) return html`${this.memberList()}${this.shared()}`;
     const shown = this.filterOwner ? this.owners.filter((o) => o.owner.username === this.filterOwner) : this.owners;
-    return html`<div class="owner-list">${repeat(shown.slice(0, this.limit), (o) => o.owner.username, (o) => this.cardOf(o))}</div>
+    const deleting = !!this.canDelete && shown.some((o) => o.rows.some((r) => this.canDelete!(r.source.owner)));
+    const help = this.selectable && shown.length ? html`<p class="mail-help" data-review="mail-help"><calcite-icon icon="envelope" scale="s" aria-hidden="true"></calcite-icon>
+      <span>${t('review.mail.help')}${deleting ? ` ${t('review.mail.help.deleting', { pick: t('review.delete.pickRow') })}` : ''}</span></p>` : nothing;
+    return html`${help}<div class="owner-list">${repeat(shown.slice(0, this.limit), (o) => o.owner.username, (o) => this.cardOf(o))}</div>
       ${shown.length > this.limit ? html`<div class="owner-end" aria-hidden="true" style="height:1px"></div>` : nothing}
       ${this.shared()}`;
   }

@@ -2,7 +2,8 @@
 // send a test to yourself, and only after an explicit confirm send real digests, one owner at a time, with pause,
 // resume and retry. Who may send what is decided in ./gate; digests are built in ./digest; the run is ./send-queue.
 // Light DOM, so the global Calcite and token styles apply (src/styles/emails.css).
-import { t, tn, tnParts } from '../../i18n';
+import { LOCALE_NAMES, LOCALES, t, tn, tnParts, withLocale, type Locale } from '../../i18n';
+import { emailLocale, onEmailLocaleChange, setEmailLocale } from './email-locale';
 import { LocaleController } from '../../i18n/controller';
 import { noEmailLine, selectAll, selectionOf, selectNone, splitByEmail } from './select';
 import { sendErrorText, testToast } from './toast-copy';
@@ -32,7 +33,7 @@ import { getLogChoice, getNudgeLog, getNudgeSends, getOthersUnreadable, LOG_TITL
 import { othersUnreadableLine, renudgeLine } from '../../domain/cooldown';
 import { agoText, credit, plural } from '../shared/text';
 import {
-  buildDigest, chipsToTokens, emailHtml, esc, fillSubject, firstName, outsideLinks, PH_LABEL, PLACEHOLDERS, TONES, tokensToChips, totalCredits,
+  buildDigest, chipsToTokens, emailHtml, esc, fillSubject, firstName, outsideLinks, phLabel, placeholders, tone as toneOf, TONE_KEYS, tokensToChips, totalCredits,
   usedPlaceholders, type Admin, type EmailOrg, type EmailOwner, type PlaceholderKey, type ToneKey,
 } from './digest';
 import { nextSendStep, sendGate, type Gate, type SendStep } from './gate';
@@ -44,14 +45,24 @@ import { createSendQueue, tidyLine, tidyWarning, type QueueItem, type QueueSnaps
 const INTRO_KEY = 'dc-email-intro-hidden';
 const introHidden = (): boolean => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch { return false; } };
 
-/** The template draft survives leaving and coming back to this step, in memory only (it can name nobody). */
-const draft: { tone: ToneKey; subject: string; tpl: string; dirty: boolean } = {
-  tone: 'friendly', subject: TONES.friendly.subject, tpl: TONES.friendly.html, dirty: false,
+/** A tone's starting subject and template, in the email's language (not the app's). */
+const startingTemplate = (k: ToneKey) => withLocale(emailLocale(), () => toneOf(k));
+/**
+ * The template draft survives leaving and coming back to this step, in memory only (it can name nobody). `madeIn` is the
+ * language its text was written in: an unedited draft follows the email language; an edited one is only replaced on request.
+ */
+const draft: { tone: ToneKey; subject: string; tpl: string; dirty: boolean; madeIn: Locale | null } = {
+  tone: 'friendly', subject: '', tpl: '', dirty: false, madeIn: null,
+};
+const freshDraft = (): void => {
+  if (draft.dirty && draft.madeIn) return;
+  const s = startingTemplate(draft.tone);
+  Object.assign(draft, { subject: s.subject, tpl: s.html, madeIn: emailLocale() });
 };
 
 type SetupState = 'work' | 'done' | 'reuse';
 interface Toast { title: string; message: string; kind: 'success' | 'danger' }
-type Dialog = 'intro' | 'turn-on' | 'confirm' | 'tone' | 'link' | null;
+type Dialog = 'intro' | 'turn-on' | 'confirm' | 'tone' | 'lang' | 'link' | null;
 
 const phaseLabel = (phase: QueueItem['phase']): string => t(({ waiting: 'emails.run.waiting', sending: 'emails.run.sending', done: 'emails.run.done', failed: 'emails.run.failed', skipped: 'emails.run.skipped', 'not-added': 'emails.run.not.added' } as const)[phase]);
 
@@ -104,6 +115,8 @@ export class DcEmails extends LitElement {
   /** The choice in force for the run under way (fixed at confirm). */
   private logOn = false;
   private pendingTone: ToneKey | null = null;
+  private pendingLocale: Locale | null = null;
+  private offEmailLocale: (() => void) | null = null;
   private queue: SendQueue | null = null;
   /** DC-125d: this run's sends that now have a log row, so reading the log back can stop counting them twice. */
   private runPageSends: Date[] = [];
@@ -143,9 +156,32 @@ export class DcEmails extends LitElement {
   }
 
   /* ------------------------------------------------------------ lifecycle */
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.offEmailLocale = onEmailLocaleChange(() => this.requestUpdate());
+    this.syncDraft();
+  }
+  override disconnectedCallback(): void {
+    this.offEmailLocale?.(); this.offEmailLocale = null;
+    super.disconnectedCallback();
+  }
+  /** An unedited template follows the email language (the app's until the admin picks one); an edited one stays. */
+  private syncDraft(): void {
+    if (draft.madeIn === emailLocale() && this.subject === draft.subject && this.tpl === draft.tpl) return;
+    freshDraft();
+    this.tone = draft.tone; this.subject = draft.subject; this.tpl = draft.tpl;
+    if (this.hasUpdated) this.loadEditor(this.tpl);
+  }
+  /** The same owners as before (only their sentences changed, e.g. a new email language): keep the admin's ticks. */
+  private ownersKey = '';
+
   protected override willUpdate(changed: PropertyValues): void {
+    if (!draft.dirty) this.syncDraft();
     if (changed.has('owners')) {
-      this.ticked = new Set(this.sendable.map((o) => o.username));
+      const key = this.owners.map((o) => `${o.username}:${o.rows.map((r) => r.id).join(',')}`).join('|');
+      if (key !== this.ownersKey) this.ticked = new Set(this.sendable.map((o) => o.username));
+      else this.ticked = new Set(this.sendable.filter((o) => this.ticked.has(o.username)).map((o) => o.username));
+      this.ownersKey = key;
       if (!this.sendable.some((o) => o.username === this.sel)) this.sel = this.sendable[0]?.username ?? null;
     }
     if (this.checkedFor !== this.notifier) { this.checkedFor = this.notifier; void this.checkRole(); }
@@ -221,7 +257,7 @@ export class DcEmails extends LitElement {
     document.execCommand('insertText', false, e.clipboardData?.getData('text/plain') ?? '');
   };
   private insertPlaceholder(k: PlaceholderKey): void {
-    this.exec('insertHTML', `<span class="ph" contenteditable="false" data-ph="${k}" title=${t('emails.placeholder.title')}>${esc(PH_LABEL[k])}</span>&nbsp;`);
+    this.exec('insertHTML', `<span class="ph" contenteditable="false" data-ph="${k}" title="${esc(t('emails.placeholder.title'))}">${esc(phLabel(k))}</span>&nbsp;`);
   }
   private addLink = (): void => {
     const input = this.querySelector<HTMLInputElement>('#em-link-url');
@@ -241,9 +277,27 @@ export class DcEmails extends LitElement {
     this.openDialog('tone', null);
   };
   private applyTone(k: ToneKey): void {
-    this.tone = k; this.subject = TONES[k].subject; this.tpl = TONES[k].html;
-    Object.assign(draft, { tone: k, subject: this.subject, tpl: this.tpl, dirty: false });
+    const s = startingTemplate(k);
+    this.tone = k; this.subject = s.subject; this.tpl = s.html;
+    Object.assign(draft, { tone: k, subject: this.subject, tpl: this.tpl, dirty: false, madeIn: emailLocale() });
     this.loadEditor(this.tpl);
+  }
+  private onLang = (e: Event): void => {
+    const k = (e.target as HTMLInputElement).value as Locale;
+    if (k === emailLocale()) return;
+    if (!draft.dirty) { void this.applyLang(k); return; }
+    this.pendingLocale = k;
+    this.openDialog('lang', null);
+  };
+  /** The emails are written in `k` from now on: the starting template of the same tone, and the owners' sentences (host). */
+  private async applyLang(k: Locale): Promise<void> {
+    await setEmailLocale(k);
+    this.applyTone(this.tone);
+  }
+  private keepLang(): void {
+    this.pendingLocale = null;
+    const item = this.querySelector<HTMLElement & { checked: boolean }>(`#em-lang calcite-segmented-control-item[value="${emailLocale()}"]`);
+    if (item) item.checked = true;
   }
   private keepTone(): void {
     this.pendingTone = null;
@@ -260,6 +314,7 @@ export class DcEmails extends LitElement {
     const was = this.dialog;
     this.dialog = null;
     if (was === 'tone' && this.pendingTone) this.keepTone();
+    if (was === 'lang' && this.pendingLocale) this.keepLang();
     // A dialog that opened by itself (the first-visit "Before you send") has no opener: go to the page heading, not the logo (A11Y-04).
     const opener = this.returnFocus;
     const back = opener && opener !== document.body && opener.isConnected ? opener : this.querySelector<HTMLElement>('#email-h');
@@ -327,7 +382,7 @@ export class DcEmails extends LitElement {
       // The test never creates the group for a real admin: turning sending on is its own, deliberate step (ADR 0013).
       if (!n.group && !this.demo) throw new Error(t('emails.test.off.first'));
       await this.ensureGroup();
-      const d = buildDigest(o, this.template, this.ctx, { test: true });
+      const d = withLocale(emailLocale(), () => buildDigest(o, this.template, this.ctx, { test: true }));
       await n.sendTest(d.subject, d.html); // to the signed-in admin only; there is no way to name anyone else
       this.testSentAt = Date.now();
       // ArcGIS accepted it (a failure threw above and never gets here): tell the host, which unlocks owner sends for this session.
@@ -382,7 +437,7 @@ export class DcEmails extends LitElement {
     const n = this.notifier;
     if (!n) { this.step = 'compose'; return; }
     const entries = this.toSend.map((o) => {
-      const d = buildDigest(o, this.template, this.ctx);
+      const d = withLocale(emailLocale(), () => buildDigest(o, this.template, this.ctx));
       return { username: o.username, fullName: o.fullName, subject: d.subject, html: d.html };
     });
     if (!entries.length) { this.step = 'compose'; return; }
@@ -595,20 +650,28 @@ export class DcEmails extends LitElement {
     const from = this.admin.email ? `<${this.admin.email}>` : `(${t('emails.preview.you')})`;
     return html`<div class="inbox">
       <div class="inbox-meta">
-        <div class="inbox-subj" data-preview="subject">${fillSubject(this.subject, o, this.ctx)}</div>
+        <div class="inbox-subj" data-preview="subject" lang=${emailLocale()}>${withLocale(emailLocale(), () => fillSubject(this.subject, o, this.ctx))}</div>
         <div class="inbox-line"><calcite-avatar scale="s" full-name=${this.admin.name} username=${this.admin.username}></calcite-avatar>
           <span><b>${this.admin.name}</b> <span class="muted">${from}</span><br><span class="muted small">${t('emails.preview.to')} ${o.fullName}${o.email ? ` <${o.email}>` : ''}</span></span></div>
       </div>
-      <div class="inbox-body" data-preview="body">${unsafeHTML(emailHtml(this.tpl, o, this.ctx))}</div>
+      <div class="inbox-body" data-preview="body" lang=${emailLocale()}>${unsafeHTML(withLocale(emailLocale(), () => emailHtml(this.tpl, o, this.ctx)))}</div>
     </div>`;
   }
 
   private renderEditor() {
     const used = usedPlaceholders(this.tpl);
     const outside = outsideLinks(this.tpl);
+    const lang = emailLocale();
     return html`<div class="em-edit-body">
+      ${LOCALES.length > 1 ? html`<div class="em-lang" data-emails="lang">
+        <calcite-label layout="inline">${t('emails.lang.label')}
+          <calcite-segmented-control id="em-lang" scale="s" label=${t('emails.lang.label')} @calciteSegmentedControlChange=${this.onLang}>
+            ${LOCALES.map((l) => html`<calcite-segmented-control-item value=${l} lang=${l} ?checked=${l === lang}>${LOCALE_NAMES[l]}</calcite-segmented-control-item>`)}
+          </calcite-segmented-control></calcite-label>
+        <span class="muted small">${t('emails.lang.hint')}</span>
+      </div>` : nothing}
       <calcite-segmented-control id="em-tone" width="full" scale="m" label=${t('emails.tone')} @calciteSegmentedControlChange=${this.onTone}>
-        ${(Object.keys(TONES) as ToneKey[]).map((k) => html`<calcite-segmented-control-item value=${k} ?checked=${k === this.tone}>${TONES[k].label}</calcite-segmented-control-item>`)}
+        ${TONE_KEYS.map((k) => html`<calcite-segmented-control-item value=${k} ?checked=${k === this.tone}>${toneOf(k).label}</calcite-segmented-control-item>`)}
       </calcite-segmented-control>
       <calcite-label>${t('emails.subject')}<calcite-input id="em-subject" scale="s" label=${t('emails.subject')} .value=${this.subject}
         @calciteInputInput=${(e: Event) => { this.subject = (e.target as HTMLInputElement).value; draft.subject = this.subject; draft.dirty = true; }}></calcite-input></calcite-label>
@@ -621,7 +684,7 @@ export class DcEmails extends LitElement {
       <div class="em-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label=${t('emails.template.aria')} spellcheck="true"
         @input=${this.readEditor} @paste=${this.onPaste} @keyup=${this.remember} @mouseup=${this.remember} @focusout=${this.remember}></div>
       <div class="em-chips" @mousedown=${(e: Event) => e.preventDefault()}><span class="muted small">${t('emails.placeholder.add')}</span>
-        ${PLACEHOLDERS.map(([k, l]) => html`<calcite-button data-ph=${k} scale="s" appearance="outline" kind="brand" icon-start="plus" @click=${() => this.insertPlaceholder(k)}>${l}</calcite-button>`)}
+        ${placeholders().map(([k, l]) => html`<calcite-button data-ph=${k} scale="s" appearance="outline" kind="brand" icon-start="plus" @click=${() => this.insertPlaceholder(k)}>${l}</calcite-button>`)}
       </div>
       ${used.includes('itemList') ? nothing : html`<calcite-notice open scale="s" kind="warning" icon="exclamation-mark-triangle"><div slot="message">${t('emails.warning.no.items')}</div></calcite-notice>`}
       ${outside.length ? html`<calcite-notice open scale="s" kind="warning" icon="link"><div slot="message">${t('emails.warning.link', { url: outside[0] })}</div></calcite-notice>` : nothing}
@@ -900,9 +963,15 @@ export class DcEmails extends LitElement {
       </calcite-dialog>
 
       <calcite-dialog id="em-tone-dlg" modal @calciteDialogOpen=${this.focusMarked} heading=${t('emails.tone.switch.heading')} width-scale="s" .open=${this.dialog === 'tone'} @calciteDialogClose=${this.onDialogClose('tone')}>
-        <p>${t('emails.tone.switch.body', { tone: this.pendingTone ? TONES[this.pendingTone].label : '' })}</p>
+        <p>${t('emails.tone.switch.body', { tone: this.pendingTone ? toneOf(this.pendingTone).label : '' })}</p>
         <calcite-button slot="footer-start" appearance="transparent" kind="neutral" data-focus @click=${() => this.closeDialog()}>${t('emails.tone.keep')}</calcite-button>
         <calcite-button slot="footer-end" @click=${() => { const k = this.pendingTone; this.pendingTone = null; this.closeDialog(); if (k) this.applyTone(k); }}>${t('emails.tone.replace')}</calcite-button>
+      </calcite-dialog>
+
+      <calcite-dialog id="em-lang-dlg" modal @calciteDialogOpen=${this.focusMarked} heading=${t('emails.lang.switch.heading')} width-scale="s" .open=${this.dialog === 'lang'} @calciteDialogClose=${this.onDialogClose('lang')}>
+        <p>${t('emails.lang.switch.body', { language: this.pendingLocale ? LOCALE_NAMES[this.pendingLocale] : '' })}</p>
+        <calcite-button slot="footer-start" appearance="transparent" kind="neutral" data-focus @click=${() => this.closeDialog()}>${t('emails.lang.keep')}</calcite-button>
+        <calcite-button slot="footer-end" data-action="lang-replace" @click=${() => { const k = this.pendingLocale; this.pendingLocale = null; this.closeDialog(); if (k) void this.applyLang(k); }}>${t('emails.lang.replace')}</calcite-button>
       </calcite-dialog>
 
       <calcite-dialog id="em-link-dlg" modal @calciteDialogOpen=${this.focusMarked} heading=${t('emails.link.add.heading')} width-scale="s" .open=${this.dialog === 'link'} @calciteDialogClose=${this.onDialogClose('link')}>

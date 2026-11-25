@@ -32,3 +32,13 @@ https://www.w3.org/International/questions/qa-site-conneg): most people never ch
 - The control is a "Language" row in the account menu (demo too), names written in their own language with `lang`, no flags.
   Signed out, the landing page shows a quiet link to the other language(s). Neither appears when only one language exists. Strings added since (GH-2 content status) are translated, with
 the Spanish marked `TODO(es-review)`.
+
+## Amendment 2026-11-25: owner emails
+- Owner emails are localised in their own **email language**, picked on the Emails step (it starts as, and until picked follows, the app's
+  language). One language per send run, so the preview is exactly what goes out; per-owner languages were left for later because an
+  edited template would need one copy per language.
+- `withLocale(locale, fn)` runs `fn` with `t()`, `tn()` and the formatters in that language and switches back synchronously, telling no
+  subscriber; `ensureLocale` loads a catalogue without switching. The template, item list, why line, views sentence, tidy tip, numbers,
+  dates, footer and test mark are all built inside it.
+- Changing the email language replaces an unedited template; an edited one is replaced only after a confirm, as with the tone.
+- `domain/format.ts` keeps its fixed English forms and uses `Intl` for other languages (months, relative time, whole numbers).

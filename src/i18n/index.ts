@@ -48,6 +48,20 @@ async function load(locale: Locale): Promise<void> {
   try { catalogues.set(locale, await loaders[locale]()); } catch { /* offline or blocked: keep showing English */ }
 }
 
+/** Loads a language's catalogue without switching to it (for owner emails written in another language). */
+export async function ensureLocale(locale: Locale): Promise<void> { await load(locale); }
+
+/**
+ * Runs `fn` with every t(), tn() and formatter in `locale`, then switches back. Synchronous, so nothing else runs in between,
+ * and no subscriber is told. Used for owner emails, whose language is chosen apart from the app's (call ensureLocale first;
+ * a catalogue that is not loaded falls back to English).
+ */
+export function withLocale<T>(locale: Locale, fn: () => T): T {
+  const was = current;
+  current = locale === 'en' || catalogues.has(locale) ? locale : DEFAULT_LOCALE;
+  try { return fn(); } finally { current = was; }
+}
+
 /** Switch language: load it, update <html lang>, optionally remember the choice, and tell subscribers. */
 export async function setLocale(locale: Locale, persist = true): Promise<void> {
   await load(locale);

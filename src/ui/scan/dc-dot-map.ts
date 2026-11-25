@@ -743,7 +743,7 @@ export class DcDotMap extends LitElement {
       ${this.selectable ? html`<calcite-segmented-control scale="s" width="auto" data-scan="tool" label=${translate('scan.map.tool.label')}
         @calciteSegmentedControlChange=${(e: Event) => { this.tool = (e.target as HTMLElement & { value: string }).value === 'zoom' ? 'zoom' : 'select'; this.hideTip(); }}>
         <calcite-segmented-control-item value="select" icon-start="cursor-marquee" .checked=${live(this.tool === 'select')}>${translate('scan.map.tool.select')}</calcite-segmented-control-item>
-        <calcite-segmented-control-item value="zoom" icon-start="zoom-in-magnifying-glass" .checked=${live(this.tool === 'zoom')}>${translate('scan.map.tool.zoom')}</calcite-segmented-control-item>
+        <calcite-segmented-control-item value="zoom" icon-start="magnifying-glass-plus" .checked=${live(this.tool === 'zoom')}>${translate('scan.map.tool.zoom')}</calcite-segmented-control-item>
       </calcite-segmented-control>` : nothing}
       <calcite-button scale="s" appearance="outline" kind="neutral" icon-start="undo" data-action="zoom-back" ?disabled=${!this.zoomStack.length} @click=${this.zoomBack}>${translate('scan.map.zoom.back')}</calcite-button>
       <calcite-button scale="s" appearance="outline" kind="neutral" icon-start="zoom-out-fixed" data-action="zoom-reset" ?disabled=${!z} @click=${this.zoomReset}>${translate('scan.map.zoom.reset')}</calcite-button>

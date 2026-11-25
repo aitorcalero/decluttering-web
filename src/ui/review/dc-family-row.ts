@@ -107,9 +107,10 @@ export class DcFamilyRow extends LitElement {
       <calcite-list-item value=${s.id} data-id=${s.id} ?expanded=${r.views.length > 0} class=${cls}>
         <span slot="content-start" class="lead">
           ${this.selectable && !this.member
-            ? html`<calcite-checkbox label=${t('review.family.includeItem', { title: s.title })} .checked=${this.on}
-                @calciteCheckboxChange=${(e: Event) => this.emit('dc-item-toggle', s.id, (e.target as HTMLInputElement).checked)}></calcite-checkbox>` : nothing}
-          <calcite-icon preload class="svc" icon="feature-layer" scale="s"></calcite-icon>
+            ? html`<span class="mail-pick" title=${t('review.family.mailTip')} data-review="mail-pick"><calcite-checkbox label=${t('review.family.includeItem', { title: s.title })} .checked=${this.on}
+                @calciteCheckboxChange=${(e: Event) => this.emit('dc-item-toggle', s.id, (e.target as HTMLInputElement).checked)}></calcite-checkbox><calcite-icon preload icon="envelope" scale="s" aria-hidden="true"
+                @click=${(e: Event) => { ((e.currentTarget as HTMLElement).previousElementSibling as HTMLElement | null)?.click(); }}></calcite-icon></span>`
+            : html`<calcite-icon preload class="svc" icon="feature-layer" scale="s"></calcite-icon>`}
         </span>
         <div slot="content" class="row-main" @click=${(e: MouseEvent) => this.onRowClick(e, s.id)}>
         <div class="row-title">

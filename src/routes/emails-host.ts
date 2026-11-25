@@ -18,6 +18,7 @@ import { createUnlock, type Unlock } from '../ui/emails/unlock';
 import { createSessionNudgeLog, type NudgeLog } from '../log';
 import type { Admin, EmailOwner } from '../ui/emails/digest';
 import { emailOwners, getEmailSelection } from './email-selection';
+import { emailLocale, onEmailLocaleChange } from '../ui/emails/email-locale';
 import { go } from './router';
 import { isSolo, onSoloChange } from './review-host';
 import '../ui/emails/dc-emails';
@@ -59,11 +60,13 @@ export class AppEmails extends LitElement {
   private built = false;
   /** DC-103: Review found no one to nudge, so this step has no one in it: it sends the admin back to Review. */
   private offSolo: (() => void) | null = null;
-  private memo: { sel: unknown; owners: EmailOwner[] } | null = null;
+  private memo: { sel: unknown; locale: string; owners: EmailOwner[] } | null = null;
+  private offLocale: (() => void) | null = null;
 
-  /** Owners from the review's selection, worked out once per selection. */
+  /** Owners from the review's selection, worked out once per selection and email language (their sentences are in it). */
   private ownersFor(sel: NonNullable<ReturnType<typeof getEmailSelection>>): EmailOwner[] {
-    if (this.memo?.sel !== sel) this.memo = { sel, owners: emailOwners(sel) };
+    const locale = emailLocale();
+    if (this.memo?.sel !== sel || this.memo.locale !== locale) this.memo = { sel, locale, owners: emailOwners(sel, locale) };
     return this.memo.owners;
   }
 
@@ -72,9 +75,11 @@ export class AppEmails extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.offSolo = onSoloChange(() => this.requestUpdate());
+    this.offLocale = onEmailLocaleChange(() => this.requestUpdate());
   }
   override disconnectedCallback(): void {
     this.offSolo?.(); this.offSolo = null;
+    this.offLocale?.(); this.offLocale = null;
     super.disconnectedCallback();
   }
 

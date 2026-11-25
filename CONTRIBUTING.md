@@ -43,7 +43,11 @@ Localisation was contributed by Aitor Calero (Esri Spain). The design is in [`do
   4. English
 
   A missing key or language always falls back to English, so the UI is never blank.
-- **Owner emails** (the digest) are still English only.
+- **Owner emails** (the digest) are localised too, but in the **email language**, chosen on the Emails step (it starts as the app's language). Their text lives in `src/i18n/<code>/emails.ts`:
+  - `emails.tpl.<tone>.subject` and `emails.tpl.<tone>.html`: the three starting templates. They are HTML; keep every tag and `{placeholder}`, and keep `{itemList}` alone in its own `<p>`.
+  - `emails.digest.*`: what the app adds to every email (the item list headings, credits, the tip label, the total, the footer, the test mark, the why line and the views sentence).
+  - `emails.tone.*` and `emails.ph.*`: the tone and placeholder names the admin sees (in the app's language).
+  - Code that builds an email runs inside `withLocale(emailLocale(), ...)` (`src/i18n/index.ts`, `src/ui/emails/email-locale.ts`), so `t()`, numbers and dates come out in the email's language. A new language needs no code change for its emails.
 
 ### Adding text (any change)
 

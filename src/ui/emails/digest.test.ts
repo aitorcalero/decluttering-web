@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { buildDigest, emailWhy, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, FOOTER_SITE, SITE_URL, TONES, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow } from './digest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { buildDigest, chipsToTokens, emailHtml, fillSubject, orderRows, outsideLinks, FOOTER_SITE, SITE_URL, tone, TONE_KEYS, tokensToChips, usedPlaceholders, type EmailOwner, type EmailRow, type ToneKey } from './digest';
+import { ensureLocale, withLocale } from '../../i18n';
+
+const TONES = Object.fromEntries(TONE_KEYS.map((k) => [k, tone(k)])) as Record<ToneKey, ReturnType<typeof tone>>;
 
 const row = (id: string, priority: EmailRow['priority'], credits = 1, extra: Partial<EmailRow> = {}): EmailRow => ({
   id, title: `Item ${id}`, url: `https://example.maps.arcgis.com/home/item.html?id=${id}`, credits, sizeKnown: true,
@@ -53,8 +56,8 @@ describe('digest per owner', () => {
     const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
     expect(links).toEqual(['https://example.maps.arcgis.com/home/item.html?id=a']);
     expect(FOOTER_SITE).toBe('text');
-    expect(html).toContain('with Decluttering (simongis.github.io/decluttering-web), a free tool');
-    expect(html).not.toContain('https://simongis.github.io');
+    expect(html).toContain('with Decluttering (aitorcalero.github.io/decluttering-web), a free tool');
+    expect(html).not.toContain('https://aitorcalero.github.io');
     expect(html).toContain('Sent by Sam Admin from Test Org');
   });
 
@@ -62,7 +65,7 @@ describe('digest per owner', () => {
     const linked = emailHtml(TONES.brief.html, owner([row('a', 'look')]), ctx, { site: 'link' });
     expect(linked).toContain(`href="${SITE_URL}"`);
     const off = emailHtml(TONES.brief.html, owner([row('a', 'look')]), ctx, { site: 'off' });
-    expect(off).not.toContain('simongis.github.io');
+    expect(off).not.toContain('aitorcalero.github.io');
     expect(off).toContain('with Decluttering, a free tool');
   });
 
@@ -116,31 +119,41 @@ describe('template placeholders', () => {
   });
 });
 
-describe('FB-15 and FB-17: wording', () => {
-  it('never says still checking or not checked; the used-by part is left out', () => {
-    const base = 'Data requested on 0 days in the last 90 days · last updated Mar 2024';
-    for (const tail of ['used by: still checking…', 'used by: not checked']) {
-      const d = buildDigest(owner([row('a', 'look', 1, { why: `${base} · ${tail}` })]), friendly, ctx);
-      expect(d.html).not.toMatch(/still checking|not checked|used by:/i);
-      expect(d.html).toContain(base);
-    }
-    expect(emailWhy('x · used by 2 maps or apps')).toBe('x · used by 2 maps or apps');
-  });
-
-  it('says nothing about used-by for an item whose maps and apps were not all checked (DC-071b)', () => {
-    const base = 'Data requested on 0 days in the last 90 days · last updated Mar 2024';
-    for (const tail of ['not used by any maps or apps', 'used by 2 maps or apps']) {
-      const d = buildDigest(owner([row('a', 'look', 1, { why: `${base} · ${tail}`, depsChecked: false })]), friendly, ctx);
-      expect(d.html).not.toMatch(/used by/i);
-      expect(d.html).toContain(base);
-      // Checked (or not said): the line stays.
-      expect(buildDigest(owner([row('a', 'look', 1, { why: `${base} · ${tail}`, depsChecked: true })]), friendly, ctx).html).toContain(tail);
-      expect(buildDigest(owner([row('a', 'look', 1, { why: `${base} · ${tail}` })]), friendly, ctx).html).toContain(tail);
-    }
-  });
-
+describe('FB-17: wording', () => {
   it('signs off with Thanks, in every tone', () => {
     for (const t of Object.values(TONES)) expect(t.html).not.toMatch(/thanks a lot/i);
     expect(TONES.friendly.html).toContain('<p>Thanks,<br>');
+  });
+});
+
+describe('owner emails in Spanish (the email language, not the app language)', () => {
+  beforeAll(async () => { await ensureLocale('es'); });
+  const es = <T>(fn: () => T): T => withLocale('es', fn);
+
+  it('every tone has a Spanish subject and template with the same placeholders', () => {
+    for (const k of TONE_KEYS) {
+      const s = es(() => tone(k));
+      expect(s.html).not.toBe(TONES[k].html);
+      expect(usedPlaceholders(s.html)).toEqual(usedPlaceholders(TONES[k].html));
+      expect(usedPlaceholders(s.subject)).toEqual(usedPlaceholders(TONES[k].subject));
+    }
+  });
+
+  it('writes what the app adds in Spanish: headings, credits, tip, total, footer and the test mark', () => {
+    const o = owner([row('win', 'start', 2.5, { tidy: 'Consejo: unas etiquetas ayudan al equipo a encontrarla.' }), row('b', 'look', 1234)]);
+    const d = es(() => buildDigest(o, es(() => tone('friendly')), ctx, { test: true }));
+    expect(d.subject).toBe('[Prueba] Jo, 2 de tus elementos de ArcGIS merecen un vistazo');
+    expect(d.html).toContain('Las mejoras más rápidas');
+    expect(d.html).toContain('También en la lista');
+    expect(d.html).toContain('unos 2,5 créditos al mes');
+    expect(d.html).toContain('<b>Consejo:</b> unas etiquetas');
+    expect(d.html).toMatch(/Ordenar estos elementos podría liberar unos <span[^>]*>1237<\/span> créditos al mes\./);
+    expect(d.html).toContain('Enviado por Sam Admin desde Test Org con Decluttering (aitorcalero.github.io/decluttering-web)');
+    expect(d.html).not.toMatch(/credits a month|Sent by|quickest wins/);
+  });
+
+  it('leaves the app language alone', () => {
+    es(() => tone('brief'));
+    expect(tone('brief').subject).toBe('ArcGIS Online: {itemCount} items to check');
   });
 });

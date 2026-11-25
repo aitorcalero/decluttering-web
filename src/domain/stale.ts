@@ -1,7 +1,7 @@
 // Staleness model (ADR 0007), ported from prototype D. Pure TS: no DOM.
 // Reference date is data.org.scannedAt; usage is [[daysAgo, count], ...] relative to it, lastViewed an ISO time.
 import type { Data, EvaluateResult, Family, Option, Owner, OwnerGroup, Row, Service, Thresholds, TidyHint, UnreachableGroup } from './types';
-import { DAY, agoDays, fmtMonthYear } from './format';
+import { DAY, agoDays, fmtMonthLong, fmtMonthYear } from './format';
 import { formatNumber, getLocale, t as translate, tn } from '../i18n';
 import { COOLDOWN_DAYS, nudgedRecently } from './cooldown';
 import { byPriority, classifyPriority, cutoffsOf, priorityOf, type Priority } from './priority';
@@ -34,6 +34,8 @@ export const USAGE_READ_DAYS = 730;
 export const USAGE_RULE_DAYS = 365;
 /** What Esri says a blank lastViewed means (docs/research/usage-signals-deep-dive.md section 2). */
 export const NO_RECORD_SINCE = 'November 2022';
+/** NO_RECORD_SINCE in the current language ("November 2022", "noviembre de 2022"). */
+export const noRecordSince = (): string => fmtMonthLong('2022-11-01T00:00:00Z', 0);
 const opts = (vals: number[], label: (v: number) => string): Option[] => vals.map((value) => ({ value, get label() { return label(value); } }));
 const mbLabel = (v: number) => (v === 0 ? translate('domain.label.anySize') : v >= 1024 ? `${v / 1024} GB` : `${v} MB`);
 const AGES: [number, string][] = [[90, '3 months'], [180, '6 months'], [270, '9 months'], [365, '1 year'], [730, '2 years'], [1095, '3 years']];
@@ -98,7 +100,7 @@ type WhyRow = Pick<Row, 'lastUsedDaysAgo' | 'useKnown' | 'noUseRecorded' | 'last
 
 /** The last-used part of a why line: "Last used 8 months ago", or the unknown and no-record lines (research 7.2). */
 export function lastUsedWords(row: Pick<WhyRow, 'lastUsedDaysAgo' | 'useKnown' | 'noUseRecorded'>): string {
-  if (row.noUseRecorded) return translate('domain.why.noUse', { date: NO_RECORD_SINCE });
+  if (row.noUseRecorded) return translate('domain.why.noUse', { date: noRecordSince() });
   if (!row.useKnown) return translate('domain.why.unknown');
   if (row.lastUsedDaysAgo === null) return translate('domain.why.noRequests');
   return translate('domain.why.lastUsed', { ago: agoDays(row.lastUsedDaysAgo) });
