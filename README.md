@@ -1,6 +1,6 @@
 # Decluttering
 
-**Tidy up your ArcGIS Online content, gently.**
+**Tidy up your ArcGIS Online content, gently.** [Leer en español](README.es.md)
 
 ### [**Open the app →**](https://aitorcalero.github.io/decluttering-web/)
 
@@ -108,7 +108,13 @@ It also points out **maps and apps that refer to a layer that is no longer in yo
 
 ![Writing the emails: who gets one, the template, and a live preview of one owner's email](docs/images/emails.png)
 
+**Who gets an email.** On Review, each layer row has a tick box with an envelope, at its left: a ticked layer goes in its owner's email. The box under each owner's card ticks or unticks all of that owner's layers, and says how many go in. An owner with nothing ticked gets no email, and their card says so. A line above the cards explains this. If the list is empty with the current rule, there is no one to tick: loosen the rule on the left.
+
 Pick a tone (friendly, brief or formal), edit the template once, and preview exactly what each owner will receive: only their own ticked layers, with links to the items and the credits they'd free. **Send yourself a test first.** Nothing goes out until you press Send and confirm.
+
+**Email language.** The **Email language** switch on the Emails step sets the language the owners get the email in (English or Spanish today). It starts as the app's language. The template, the item list, the reasons, dates, numbers and the footer all follow it, and the preview shows exactly what goes out. Changing it replaces an unedited template; an edited one is replaced only after you confirm.
+
+The template keeps only plain formatting: paragraphs, bold, italic, lists and links to web or mail addresses. Scripts, images, styles and other markup are dropped, even if pasted or dragged in.
 
 ArcGIS Online sends notifications to group members, so Decluttering uses **one hidden, invitation-only group** that only you can see. It asks before creating it, reuses it, and you can remove it any time:
 
@@ -157,6 +163,9 @@ flowchart LR
 - **Sign-in is ArcGIS Online OAuth 2.0 with PKCE.** The token stays in this browser tab, goes in request headers (never in a web address), and is revoked when you sign out.
 - **Every request passes an allow-list before it is made.** The scan may only read; sending may only touch the app's own hidden group; the log may only add rows to its own table. See `SECURITY.md`.
 - **The nudge log** (optional) is a hosted table in your own org. It records who was nudged, when, and which items, never the message text.
+- **A strict Content Security Policy.** Scripts run only from this site, data goes only to `*.arcgis.com`, and the app may not frame other pages.
+- **It won't run inside another site's frame.** GitHub Pages can't send the header that forbids framing, so the app checks for itself and shows only a link to open it in its own tab. Nobody can load it in a hidden frame and trick you into pressing Send or Delete.
+- **The deploy is pinned.** Its GitHub Actions are pinned to commits, the packages the site ships are checked with `npm audit` before each deploy, and Dependabot proposes updates.
 
 ![Your data: your browser talks only to your own ArcGIS Online org](docs/images/about-data.png)
 
